@@ -34,6 +34,10 @@ Every row comes from output the human pasted. Source column names the command an
 | 26 | Job 342482 | allocated, then `Killed` (lscpu on a compute node, no output). `squeue` later showed it still running on c1 after 22:22 despite `--time=5`; 342492 was still pending. Both were cancelled by the human. The `Killed` message came from the `srun` client; the allocation outlived it. Cause unknown. | `srun ... lscpu`, `squeue -u apethan` |
 | 27 | Batch probe pinned to c3 (job 342493: `sbatch --partition=normal --nodelist=c3 --exclusive --time=1 --nodes=1 --wrap=...`) | hostname c3; nproc 16; 1 thread per core, 16 cores per socket, 1 socket, 1 NUMA node (CPUs 0-15); AMD EPYC 9115 16-Core; flags avx2, avx512f, f16c, fma present; `/usr/bin/perf`, `/usr/bin/gprof`, `/usr/bin/valgrind` exist. The job waited in the queue (reason `ReqNodeNotAvail`, then `Resources`) before running. | `cat $HOME/c3_probe.out` |
 | 28 | `--wrap`, `--output` and `--nodelist` | accepted by `sbatch` (job 342493 ran and wrote the output file) | job 342493 |
+| 29 | What occupied c3 | an array task (`342572_6`, partition `rtx4060ti`, another user's job) running for 2:33:04; c3 STATE `allocated`, REASON `none` (not down). Job 342852, the human's data-generation job pinned to c3, was `PD (Resources)`. | `squeue -w c3`, `sinfo -N -n c3 -o "%N %T %E"`, `squeue -u apethan` |
+| 30 | Partition `turin` | 22 nodes listed, all with 16 CPUs: c0 to c10, c27, c29, c50 to c56, c58, c59. States at that time: allocated c0 to c6, c29, c58; idle the rest. The memory column printed `1` for every node and is not usable. | `sinfo -N -p turin -o "%N %T %c %m"` |
+| 31 | Probe on a free `turin` node, no `--nodelist` (batch job, `--partition=turin --exclusive --time=1 --nodes=1`) | hostname c27; nproc 16; 1 thread per core, 16 cores per socket, 1 socket, 1 NUMA node (CPUs 0-15); AMD EPYC 9115 16-Core; flags avx2, avx512f, f16c, fma present. Same CPU model, core count and flags as c3. | `cat $HOME/turin_probe.out` |
+| 32 | c27 is not in partition `normal` | the first `sinfo` listed `normal` as alloc c[0,2,6,16-17,23-24,33,54-55,63-65,67-72] and idle c[1,3-5,7-15,18-22,25-26,34-36,39-48,50-53,56-58,60-62,66,73-79]; c27 is in neither list. It is listed under `all`, `qc`, `turin` and `rtx6000`. The account can run exclusive batch jobs on `turin` (row 31). Partition `turin` TIMELIMIT is 1-00:00:00. | first `sinfo` output; job in row 31 |
 
 ## Answers from the human (Round 0c)
 
@@ -41,8 +45,9 @@ Every row comes from output the human pasted. Source column names the command an
 |---|---|
 | 1 | `REPO_DIR=$HOME/outlier-aware-gemm` |
 | 2 | `data/` at `$REPO_DIR/data` |
-| 3 | T = 16, valid only on c3 |
+| 3 | T = 16, valid only on c3 (extended to c27 by answer 4b, because row 31 shows the same CPU) |
 | 4 | Pin all CPU jobs to c3; wait limit before reconsidering is 30 minutes. Probe finished (rows 15, 24, 27). |
+| 4b | Changed: pin all CPU jobs to c27 with `--partition=turin` (not c3, which another user's job occupied; rows 29 to 32). The human cancels the queued c3 job 342852. The human tells Yashvi not to pin c27 (her node is unknown to me). |
 | 5 | `--exclusive` on every job |
 | 6 | Submit each group with `sbatch` and `--partition=normal --exclusive --nodes=1`; set `OMP_PROC_BIND=close` and `OMP_PLACES=cores` inside the script; record CPU affinity (`nproc`) in each env file |
 | 7 | Split a group per shape only if it exceeds its estimate or the limit. Request each job's walltime from the smoke-run extrapolation (about 2x margin), not the 1-day maximum. One job per group. |
@@ -51,6 +56,6 @@ Every row comes from output the human pasted. Source column names the command an
 
 ## Still open
 
-1. c3 is shared with other users' jobs (row 24), so every `--exclusive` job pinned to c3 may wait in the queue before it starts. I cannot see how long.
+1. c3 is shared with other users' jobs (rows 24 and 29), so every `--exclusive` job pinned to c3 may wait in the queue before it starts. I cannot see how long. c27 has the same CPU model (row 31); whether to pin all CPU jobs to c27 instead (which needs `--partition=turin`, row 32) was decided: pin to c27 (answer 4b).
 2. Use batch jobs (`sbatch`), not interactive `srun`, for anything that may queue: a killed `srun` client left allocations running (row 26).
 3. Whether `perf` works for this account on c3 (counter permissions) is not tested; it is only known to exist.
