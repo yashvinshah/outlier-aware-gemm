@@ -33,7 +33,7 @@ outlier-gemm/
   gpu/        Lane B   GPU benchmark program
   scripts/cpu/  Lane A     scripts/gpu/  Lane B
   data/       generated on ARC, git-ignored
-  results/cpu/  results/gpu/    CSV files, env files, golden checksums, profiler output (committed, they are small)
+  results/cpu/ Lane A   results/gpu/ Lane B    CSV files, env files, golden checksums, profiler output (committed, they are small)
   docs/       env_<lane>.md and LANE_NOTES_<lane>.md, each written by its own lane
   analysis/   Lane A (Round 6)
   NOTES.md    Lane A (Round 6)
@@ -194,14 +194,14 @@ Stages and what each contains:
 | Stage | Column | Contents |
 |---|---|---|
 | select | `t_select_ms` | Step 1: column max, top-k, building the S and Nrm index lists. GPU: the column-max kernel, the copy of `colmax` to the host, the host `std::stable_sort`, and the copy of the index lists back are all included. |
-| quantize | `t_quant_ms` | Step 2: scales, quantization, gathering and packing, FP16 conversion of outlier channels. |
+| quantize | `t_quant_ms` | Step 2: scales, quantization, gathering and packing, FP16 conversion of outlier channels. GPU `int8_pertensor`: the global-max kernel is included. |
 | int8 | `t_int8_ms` | Step 3 including the dequantize to float. For fused variants: steps 3, 4 and 5 together. |
 | outlier | `t_outlier_ms` | Step 4. |
 | merge | `t_merge_ms` | Step 5. |
 
 - A stage column is **blank** if the stage does not exist in that variant (all five for `fp32_*`; select, outlier and merge for `int8_pertensor`; outlier and merge for fused variants). It is **0.0** if the stage exists but was skipped because k = 0.
 - Baselines (`fp32_*`) have a single stage, and `total_ms` is that stage.
-- All buffers are allocated before timing. File reading is not timed. GPU inputs are already on the device before timing, and copies of X, W and C between host and device are not timed. The small `colmax` and index-list copies inside select are timed.
+- All buffers are allocated before timing. Memsets, zero-fills and padding fills done once at allocation or setup, any other one-time setup, and cuBLAS handle creation are also outside every timed region, in both lanes. Anything done in every repetition to produce the packed, gathered or transposed arrays is timed inside `t_quant_ms`. File reading is not timed. GPU inputs are already on the device before timing, and copies of X, W and C between host and device are not timed. The small `colmax` and index-list copies inside select are timed.
 - CPU timer: `omp_get_wtime()`. GPU timer: host wall clock (`std::chrono::steady_clock`) with `cudaDeviceSynchronize()` before starting and before stopping each stage timer. cudaEvent timing is not used (one mechanism only).
 - Per repetition: record each stage time, and `total` = the sum of the stage times of that repetition. Report the median of each stage column and the median, minimum, maximum and population standard deviation of `total`. (Stage medians do not exactly sum to the total median.) GPU totals include the stage-boundary synchronization overhead; state this in the report.
 - Defaults: 3 warmups, 10 timed repetitions. Slow runs (`fp32_serial`, `mixed_sep_scalar`) use 1 warmup and 3 repetitions.
@@ -222,9 +222,10 @@ lane,variant,shape,M,K,N,true_out_pct,iso_out_pct,k_isolated,threads,tile,warmup
 
 - `lane` is `cpu` or `gpu`. `shape` is the name from section 5. `true_out_pct` is the number (0.5, 2, 5).
 - `iso_out_pct` and `k_isolated` are blank for `fp32_*` and `int8_pertensor`.
-- `threads` is filled for the CPU lane and blank for GPU. `tile` is filled for the GPU lane and blank for CPU.
+- `threads` is filled for the CPU lane and blank for GPU. `tile` is filled for the GPU lane and blank for CPU, except that `fp32_cublas` (it has no TILE) has `tile` blank; every other GPU variant has it filled.
 - Number formats: times `%.6f`, `gflops` `%.3f`, `rel_err` `%.9e`, `outlier_recall` `%.6f`.
 - The program appends one row per run. If the file does not exist it writes the header first.
+- The group CSV file names are given in COVERAGE section 2.
 
 ## 11. Benchmark program interface
 
@@ -248,21 +249,24 @@ Job scripts loop over configurations. One process per configuration.
 
 - CPU, all files except the scalar GEMM file: `g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off`
 - CPU scalar GEMM file (`cpu/int8_scalar.cpp`): `-std=c++17 -O2 -fno-tree-vectorize -fno-tree-slp-vectorize -fopenmp -ffp-contract=off`
-- GPU: `nvcc -std=c++17 -O3 -arch=sm_<CC> --fmad=false -Xcompiler "-O3 -ffp-contract=off" -lcublas`, with `<CC>` taken from the Round 0b output.
+- GPU: `nvcc -std=c++17 -O3 -arch=sm_<CC> --fmad=false --prec-div=true -Xcompiler "-O3 -ffp-contract=off" -lcublas`, with `<CC>` taken from the Round 0b output. `--prec-div=true` makes IEEE division independent of nvcc's default; verify it with `nvcc --help` on ARC in Round 0.
 - No `-ffast-math`, no `-march=native`, no `-mfma`. If the ARC CPU lacks AVX2 or F16C, or the GPU is below compute capability 6.1 (needed by `__dp4a`), stop and ask.
+- Round 0 only confirms that g++, nvcc and nvidia-smi exist, records their versions, and runs the `nvcc --help` grep for `prec-div` and `fmad`. That nvcc accepts `-std=c++17` with the host compiler and that `-lcublas` links are confirmed by the first build on ARC (run by the human); on failure, fix the Makefile and report.
 
 ## 13. Golden cross-check
 
 1. Shape golden, t = 2, p in {0, 2, 10}. Every program run uses `--write-c`.
 2. CPU lane runs `int8_pertensor`, `mixed_sep_scalar`, `mixed_sep_avx2`, `mixed_fused_avx2`, each with threads in {1, T}. It also checks that `fp32_omp` output equals `fp32_serial` output. Results go to `results/cpu/golden/checksums_cpu.txt`, one line per run: `<variant> threads=<n> p=<p> <hex>`.
-3. GPU lane runs `int8_pertensor`, `mixed_sep`, `mixed_fused`, each with tile in {8, 16, 32}. Results go to `results/gpu/golden/checksums_gpu.txt`, one line per run: `<variant> tile=<n> p=<p> <hex>`.
+3. GPU lane runs `int8_pertensor`, `mixed_sep`, `mixed_fused`, each with tile in {8, 16, 32}. Results go to `results/gpu/golden/checksums_gpu.txt`, one line per run: `<variant> tile=<n> p=<p> <hex>`. `fp32_cublas` is excluded from the golden check; it is covered only by COVERAGE S2.
 4. Pass criterion, all exact:
    - all CPU `mixed_*` checksums for the same p are equal to each other;
    - all GPU `mixed_*` checksums for the same p are equal to each other;
    - CPU and GPU `mixed_*` checksums for the same p are equal;
    - CPU and GPU `int8_pertensor` checksums are equal (p is not used);
-   - `fp32_omp` equals `fp32_serial`.
+   - `fp32_omp` equals `fp32_serial`;
+   - each `<variant>_opt1` checksum equals the checksum of its base variant for the same p and the same tile or threads (the numerics are fixed, so an optimization must not change the bits). A mismatch is a bug, never a tolerance to loosen. If both lanes optimize the same variant, cross-lane equality follows from the existing criteria.
 5. On any mismatch: stop. Report which pairs differ. The humans commit the small C files, and `common/compare_c` reports the number of differing elements and the maximum absolute difference. Do not loosen the criterion.
+6. Round 5: golden lines for `<variant>_opt1` are appended to the same `checksums_<lane>.txt` in the same format, with the variant name `<variant>_opt1`. Their C files use the naming of 17.5 under `data/golden_out/<lane>/`. Re-running the golden check for `<variant>_opt1` is required (COVERAGE section 5). `<variant>_opt1` golden runs use the same parameters as the base variant (GPU: p in {0, 2, 10}, tile in {8, 16, 32}; CPU: p in {0, 2, 10}, threads in {1, T}).
 
 ## 14. Environment file
 
@@ -294,3 +298,35 @@ The numbers follow the order of Lane A's review list.
 12. **Which variant gets `_opt1`.** Decided in Round 5 from the profile data and approved by the humans before any code is written.
 13. **Git in the env script.** The job scripts may call `git rev-parse HEAD`. The humans run the scripts on ARC. The ban in CLAUDE.md rule 1 applies to Claude Code itself, which never runs git.
 14. **Aligned allocation.** `posix_memalign` with 64-byte alignment (CPU lane). Confirm on the first ARC build.
+
+## 18. Rulings (Nov 17, second batch)
+
+Agreed by both humans. Section 17 is unchanged. Where a ruling is applied in another section, the pointer is given.
+
+1. **GPU build flag.** `--prec-div=true` is part of the GPU flags (section 12); verify it with `nvcc --help` on ARC in Round 0.
+2. **Golden check.** `fp32_cublas` is excluded. The `<variant>_opt1` golden lines, their C file names, the required re-run and the pass criterion are in section 13.
+3. **CSV.** `tile` is blank for `fp32_cublas` (section 10). Group CSV names follow `results/<lane>/<letter>_<short name>.csv`, listed in COVERAGE section 2.
+4. **Timing convention.** Allocation, memsets, zero-fills and padding fills done once at allocation or setup, other one-time setup and cuBLAS handle creation are untimed in both lanes; work done in every repetition to produce packed, gathered or transposed arrays is timed in `t_quant_ms` (section 8). The GPU `int8_pertensor` global-max kernel is inside `t_quant_ms` (section 8).
+5. **Group E.** The six rows of each lane use one variant, chosen per 17.12. Scripts: `scripts/gpu/run_E_opt.sh` and `scripts/cpu/run_E_opt.sh`.
+6. **Shapes.** "All 5 shapes" in COVERAGE means the five non-golden shapes: sq1024, sq2048, sq4096, skinny16, skinny128. GPU skinny shapes run at tile 16 only.
+7. **Ownership.** `results/cpu/` belongs to Lane A and `results/gpu/` to Lane B (section 3). Job scripts may call `git rev-parse HEAD` (17.13).
+8. **Git workflow.** Humans only; see CLAUDE.md section 2, "Git workflow (humans only)".
+9. **`common/` not yet merged (Lane B).** See the header of LANE_GPU.md.
+10. **Round 0 confirmations.** Listed in section 12.
+
+## Change log
+
+- 2026-11-17, SPEC section 3: `results/cpu/` and `results/gpu/` owners added to the layout (ruling G).
+- 2026-11-17, SPEC section 8: quantize row names the GPU `int8_pertensor` global-max kernel; untimed-setup convention added to the buffers bullet (ruling D).
+- 2026-11-17, SPEC section 10: `tile` blank for `fp32_cublas`; pointer to COVERAGE section 2 for group CSV names (ruling C).
+- 2026-11-17, SPEC section 12: `--prec-div=true` added to GPU flags, with verification note (ruling A); Round 0 confirmation bullet added (ruling J).
+- 2026-11-17, SPEC section 13: `fp32_cublas` exclusion (step 3), `_opt1` pass criterion (step 4), new step 6 for `_opt1` golden lines and required re-run (ruling B).
+- 2026-11-17, SPEC section 18: added (rulings A to J).
+- 2026-11-17, CLAUDE.md: owners of `results/` (header); job scripts may call `git rev-parse HEAD` (rule 1); "Git workflow (humans only)" under section 2 (ruling H); Round 1 and Round 5 wording; constants line aligned to SPEC 17.1.
+- 2026-11-17, COVERAGE.md: section 2 shape meaning and group CSV names; section 5 `_opt1` golden re-run and group E variant and script.
+- 2026-11-17 (final rulings), SPEC section 12: Round 0 confirmation bullet narrowed to existence, versions and the `nvcc --help` grep; `-std=c++17` and `-lcublas` are confirmed by the first ARC build.
+- 2026-11-17 (final rulings), SPEC section 13 step 6: `_opt1` golden runs use the base variant's parameters.
+- 2026-11-17 (final rulings), SPEC section 13 step 4: `_opt1` bullet replaced by equality with the base variant's checksum.
+- 2026-11-17 (final rulings), SPEC section 8 and section 18 item 4: once-only zero-fills are untimed; per-repetition packing, gathering and transposing is timed in `t_quant_ms`.
+- 2026-11-17 (final rulings), CLAUDE.md Round 5, COVERAGE section 5, LANE_CPU.md and LANE_GPU.md (Round 0c, Round 5, timing notes): aligned to the four rulings above.
+- 2026-11-17, LANE_CPU.md and LANE_GPU.md: ownership of `results/`; Round 0c walltime question; `checksum.h`; Round 1 and Round 2 helper-script wording; untimed-setup notes; Round 5 golden re-run and group E script; GPU `--prec-div` and `common/` not merged (rulings A, D, E, G, I, J).

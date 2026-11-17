@@ -2,10 +2,10 @@
 
 You are Lane B. You write the CUDA benchmark.
 
-**You own:** `gpu/`, `scripts/gpu/`, `docs/env_gpu.md`, `docs/LANE_NOTES_gpu.md`.
-**You must not edit:** `common/`, `cpu/`, `scripts/cpu/`, `analysis/`, `NOTES.md`, `.gitignore`, `docs/*_cpu.md`, `SPEC.md`, `COVERAGE.md`, `CLAUDE.md`.
+**You own:** `gpu/`, `scripts/gpu/`, `results/gpu/`, `docs/env_gpu.md`, `docs/LANE_NOTES_gpu.md`.
+**You must not edit:** `common/`, `cpu/`, `scripts/cpu/`, `results/cpu/`, `analysis/`, `NOTES.md`, `.gitignore`, `docs/*_cpu.md`, `SPEC.md`, `COVERAGE.md`, `CLAUDE.md`.
 
-Lane A writes `common/` (data generator, `compare_c`, `params.h`). Until Lane A's code is pushed and pulled, you can write your code but cannot test it. `common/params.h` has the exact content shown in SPEC 4.1; your code includes it from `../common/params.h`.
+Lane A writes `common/` (data generator, `compare_c`, `params.h`, `checksum.h`). Until Lane A's code is pushed and pulled, you can write your code but cannot test it. `common/params.h` has the exact content shown in SPEC 4.1; your code includes it from `../common/params.h`, and FNV-1a from `../common/checksum.h` (SPEC 17.1). If `common/` has not been merged yet, you may write code and the Makefile against `../common/params.h` and `../common/checksum.h` without compiling or running anything. `gen_data` and `compare_c` are built and run by the human on ARC, and the `data/` location comes from Round 0c.
 
 ## Round 0a: base commands (login node, read-only)
 
@@ -34,17 +34,18 @@ From the 0a output, write the minimal command(s) that, inside a GPU allocation o
 nvidia-smi
 nvidia-smi --query-gpu=name,compute_cap,memory.total,driver_version --format=csv
 nvcc --version
+nvcc --help | grep -E "prec-div|fmad"              # CHECK: verifies the SPEC 12 flags exist
 ```
 
 The `compute_cap` query field does not exist on older drivers. If the second command errors, tell the human to rely on the plain `nvidia-smi` output and ask what the GPU model's compute capability is rather than guessing it. Also ask how to get an exclusive GPU node on this scheduler (read the 0a output; if it is not answered there, ask). Stop.
 
 ## Round 0c: facts and questions
 
-Write `docs/env_gpu.md`. Questions you must ask, each with a proposed default: the value of `REPO_DIR` on ARC; where `data/` should live given the quota; the exact `-arch=sm_<CC>` value; the scheduler and how GPU jobs are submitted; the CUDA module to load; whether the node is exclusive. If the GPU's compute capability is below 6.1, stop: `__dp4a` is not available (SPEC 12).
+Write `docs/env_gpu.md`. Questions you must ask, each with a proposed default: the value of `REPO_DIR` on ARC; where `data/` should live given the quota; the exact `-arch=sm_<CC>` value; the scheduler and how GPU jobs are submitted; the CUDA module to load; whether the node is exclusive; the scheduler's maximum walltime (SPEC 17.11). Also record, from the pasted output, that g++, nvcc and nvidia-smi exist, their versions, and whether `nvcc --help` lists `prec-div` and `fmad` (SPEC 12). That nvcc accepts `-std=c++17` with the host compiler and that `-lcublas` links are confirmed by the first build on ARC (run by the human); on failure, fix the Makefile and report. If the GPU's compute capability is below 6.1, stop: `__dp4a` is not available (SPEC 12).
 
 ## Round 1: files, in this order
 
-1. `gpu/util.h` and `gpu/util.cpp`: file reading, FNV-1a, statistics (median, min, max, population standard deviation), CSV writing, `rel_err`, `outlier_recall`, the CUDA error-check macro.
+1. `gpu/util.h` and `gpu/util.cpp`: file reading, statistics (median, min, max, population standard deviation), CSV writing, `rel_err` (SPEC 17.3), `outlier_recall`, the CUDA error-check macro. FNV-1a comes from `../common/checksum.h` (SPEC 17.1).
 2. `gpu/select.cu`: Step 1: a column-max kernel, copy of `colmax` to the host, `std::stable_sort` on the host (colmax descending, index ascending on ties), building S and Nrm, copy of the index lists back to the device.
 3. `gpu/quant.cu`: Step 2: scale kernels, quantize and gather kernels, FP16 gather kernels, including the packing the `__dp4a` kernel needs.
 4. `gpu/int8_gemm.cu`: Step 3, the `__dp4a` kernel, templated on TILE in {8, 16, 32}, output float `Ci8`.
@@ -55,32 +56,32 @@ Write `docs/env_gpu.md`. Questions you must ask, each with a proposed default: t
 9. `gpu/bench_gpu.cu`: command line (SPEC 11), loading the data files and copying them to the device before timing, the warmup and timing loop (SPEC 8), stage timers, the CSV row, `--write-c`.
 10. `gpu/Makefile` with the SPEC 12 flags.
 
-Do not write job scripts yet. Give the build and golden-test commands for ARC. Ask the human to paste the build output and the output of one small run per variant on the golden shape.
+Do not write job scripts yet. Give the build commands and plain per-variant commands for one small run on the golden shape (SPEC 17.7). Ask the human to paste the build output and the output of one small run per variant on the golden shape.
 
 ## Technical notes (all of these are facts; follow them)
 
 - `__dp4a(int a, int b, int c)` treats `a` and `b` as four packed signed 8-bit values each and returns `c` plus their 4-element dot product. It needs compute capability 6.1 or higher. Use the signed (int) overload.
-- `__dp4a` needs 4 consecutive channels packed into one 32-bit word for both operands. So X rows are stored with channels contiguous (4 per word), and W is stored transposed (N rows of channels, 4 per word). Pad K - k up to a multiple of 4 with zeros in both operands; zeros do not change the sum. Packing and transposing belong to the quantize stage and are timed there.
+- `__dp4a` needs 4 consecutive channels packed into one 32-bit word for both operands. So X rows are stored with channels contiguous (4 per word), and W is stored transposed (N rows of channels, 4 per word). Pad K - k up to a multiple of 4 with zeros in both operands; zeros do not change the sum. Packing and transposing belong to the quantize stage and are timed there; a zero fill of the padding done once at allocation or setup is untimed, but anything done in every repetition to produce the packed or transposed arrays is timed (SPEC 8).
 - FP16: include `cuda_fp16.h`; use `__float2half_rn` and `__half2float`. The outlier path converts back to float and multiplies and accumulates in float32 in ascending channel order (SPEC 6 step 4).
 - cuBLAS is column-major. To compute row-major C = X * W, call SGEMM on the transposed problem with the operands swapped. Call `cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH)`. Expect `rel_err` of `fp32_cublas` around 1e-7 to 1e-6; a value near 1e-3 means TF32 is active, which is a bug (COVERAGE S2).
-- Build with `--fmad=false`. Division and `roundf` must be the standard (IEEE) ones; do not use fast-math intrinsics.
+- Build with the SPEC 12 flags, including `--fmad=false` and `--prec-div=true`. Division and `roundf` must be the standard (IEEE) ones; do not use fast-math intrinsics.
 - Timing: host wall clock with `cudaDeviceSynchronize()` before starting and before stopping each stage timer (SPEC 8). No cudaEvent timing.
-- All device buffers are allocated before timing. Inputs are already on the device before timing.
+- All device buffers are allocated before timing. Inputs are already on the device before timing. Memsets, zero-fills and padding fills done once at allocation or setup, and cuBLAS handle creation, are also outside every timed region; anything done in every repetition to produce the packed, gathered or transposed arrays is timed inside `t_quant_ms`; the `int8_pertensor` global-max kernel is inside `t_quant_ms` (SPEC 8).
 - Kernel design: one thread per output element, blocks of TILE x TILE threads, shared-memory tiles over the packed channel dimension. No register blocking, no warp tricks, no tensor cores, no cuBLASLt, no CUTLASS. Simplicity is the goal in version 1.
 - The fused kernel does the INT8 loop first, then the outlier loop in ascending channel order, then writes `((float)acc * sx[i]) * sw[j]` plus the outlier sum, so the bits equal the separate version.
 - Skinny shapes (M = 16 or 128): compute the grid from M, N and TILE, and make sure partial tiles at the edges are handled (N is a multiple of 8 for all shapes; M is not a multiple of 32 for skinny16).
 
 ## Round 2
 
-Run the golden procedure of SPEC 13 for the GPU lane and write `scripts/gpu/run_golden.sh`, which writes `results/gpu/golden/checksums_gpu.txt`. The human exchanges the checksum files with Lane A (via the repo or by pasting) and both sessions compare.
+At the start of this round write `scripts/gpu/write_env.sh` and `scripts/gpu/run_golden.sh` (SPEC 17.7). Run the golden procedure of SPEC 13 for the GPU lane; `run_golden.sh` which writes `results/gpu/golden/checksums_gpu.txt`. The human exchanges the checksum files with Lane A (via the repo or by pasting) and both sessions compare.
 
 ## Round 3: job scripts
 
-Groups A, B, C of COVERAGE section 2 (GPU lane), one script each: `scripts/gpu/run_A_baselines.sh`, `run_B_sweep.sh`, `run_C_tiles.sh`. Each script: writes the env file first (SPEC 14), loops over configurations, and appends to `results/gpu/<group>.csv`. Add the submission wrapper that matches the scheduler found in Round 0. Start with a tiny smoke job (golden shape, a few configurations) before the full groups.
+Groups A, B, C of COVERAGE section 2 (GPU lane), one script each: `scripts/gpu/run_A_baselines.sh`, `run_B_sweep.sh`, `run_C_tiles.sh`. Each script: writes the env file first (SPEC 14), loops over configurations, and appends to `results/gpu/<group>.csv` (file names: COVERAGE section 2). Add the submission wrapper that matches the scheduler found in Round 0. Start with a tiny smoke job (golden shape, a few configurations) before the full groups.
 
 ## Round 5 (GPU specifics)
 
-Use `ncu` or `nsys` only if Round 0 found them (`nvprof` only if the GPU generation supports it; ask). If no profiler exists, the stage columns are the evidence; say so and ask the human before relying on that. Save profiler output under `results/gpu/profile/`.
+Use `ncu` or `nsys` only if Round 0 found them (`nvprof` only if the GPU generation supports it; ask). If no profiler exists, the stage columns are the evidence; say so and ask the human before relying on that. Save profiler output under `results/gpu/profile/`. The group E script is `scripts/gpu/run_E_opt.sh`. Re-run the golden check for `<variant>_opt1` and with the base variant's parameters (p in {0, 2, 10}, tile in {8, 16, 32}) and append its lines to `checksums_gpu.txt` (SPEC 13 step 6).
 
 ## Round 6
 

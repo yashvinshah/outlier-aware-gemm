@@ -23,7 +23,7 @@ This file defines what "complete" means. Round 4 validation is run against it, l
 
 ## 2. Run matrix
 
-Shape names, t levels and p levels are from SPEC 5. Defaults: CPU `threads` = T, GPU `tile` = 16. The thread list L is the powers of two from 1 up to T, plus T if T is not a power of two.
+Shape names, t levels and p levels are from SPEC 5. Defaults: CPU `threads` = T, GPU `tile` = 16. The thread list L is the powers of two from 1 up to T, plus T if T is not a power of two. "All 5 shapes" means the five non-golden shapes: sq1024, sq2048, sq4096, skinny16, skinny128. GPU skinny shapes run at the default tile 16 only.
 
 ### CPU lane
 
@@ -50,7 +50,7 @@ Shape names, t levels and p levels are from SPEC 5. Defaults: CPU `threads` = T,
 
 Group C of the GPU lane has no scalar ladder; the GPU ladder is `int8_pertensor` then `mixed_sep` then `mixed_fused`, taken from groups A and B.
 
-Each CSV is written by the group's job script to `results/<lane>/<group>.csv`, for example `results/cpu/B_sweep.csv`.
+Each CSV is written by the group's job script to `results/<lane>/<letter>_<short name>.csv`. GPU: `A_baselines.csv`, `B_sweep.csv`, `C_tiles.csv`, `E_opt.csv`. CPU: `A_baselines.csv`, `B_sweep.csv`, `C_ladder.csv`, `D_scaling.csv`, `E_opt.csv`. Group G (golden) writes the checksum files of SPEC 13, not a CSV.
 
 ## 3. Defaults for repetitions
 
@@ -85,7 +85,8 @@ For each lane, in this order:
 ## 5. Group E (profile-driven optimization)
 
 - The profiling commands, the profiler output (saved under `results/<lane>/profile/`), and the reasoning go into `docs/LANE_NOTES_<lane>.md`.
-- The optimization must not change output bits. Re-run the golden check for `<variant>_opt1`. If the optimization cannot keep bit-identity, ask the human first.
+- The optimization must not change output bits. Re-running the golden check for `<variant>_opt1` is required (SPEC 13 step 6: same parameters as the base variant; the lines are appended to the same checksums file). If the optimization cannot keep bit-identity, ask the human first.
+- The six group E rows use one variant, chosen per SPEC 17.12. The group E script is `scripts/<lane>/run_E_opt.sh`.
 - The report needs before and after numbers for the same configurations: the originals come from group B, the new ones from group E.
 
 ## 6. Final assets (Round 6)

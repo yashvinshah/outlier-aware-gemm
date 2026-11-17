@@ -2,8 +2,8 @@
 
 You are Lane A. You write the shared tools in `common/` first, then the CPU benchmark.
 
-**You own:** `.gitignore`, `common/`, `cpu/`, `scripts/cpu/`, `analysis/`, `NOTES.md`, `docs/env_cpu.md`, `docs/LANE_NOTES_cpu.md`.
-**You must not edit:** `gpu/`, `scripts/gpu/`, `docs/*_gpu.md`, `SPEC.md`, `COVERAGE.md`, `CLAUDE.md`.
+**You own:** `.gitignore`, `common/`, `cpu/`, `scripts/cpu/`, `results/cpu/`, `analysis/`, `NOTES.md`, `docs/env_cpu.md`, `docs/LANE_NOTES_cpu.md`.
+**You must not edit:** `gpu/`, `scripts/gpu/`, `results/gpu/`, `docs/*_gpu.md`, `SPEC.md`, `COVERAGE.md`, `CLAUDE.md`.
 
 Lane B cannot test anything until your generator exists. In Round 1, write and hand over `common/` first, then tell the human to push it before you continue.
 
@@ -38,12 +38,12 @@ From the 0a output, write the minimal command(s) that run `lscpu`, `nproc`, `fre
 
 ## Round 0c: facts and questions
 
-Write `docs/env_cpu.md`. Questions you must ask at this point, each with a proposed default: the value of `REPO_DIR` on ARC; where `data/` should live given the quota; the value of T (physical cores of the node, not hyperthreads); the scheduler and the way jobs are submitted; whether the node is exclusive.
+Write `docs/env_cpu.md`. Questions you must ask at this point, each with a proposed default: the value of `REPO_DIR` on ARC; where `data/` should live given the quota; the value of T (physical cores of the node, not hyperthreads); the scheduler and the way jobs are submitted; whether the node is exclusive; the scheduler's maximum walltime (SPEC 17.11).
 
 ## Round 1: files, in this order
 
 1. `.gitignore`: ignore `data/`, object files and the `bench_cpu`, `gen_data`, `compare_c` binaries. Do not ignore `results/`.
-2. `common/params.h`: exactly the content in SPEC 4.1.
+2. `common/params.h`: exactly the content in SPEC 4.1. Also `common/checksum.h`: header-only inline FNV-1a, included by `gen_data`, `compare_c`, `cpu/util` and `gpu/util` (SPEC 17.1).
 3. `common/fp32_gemm.h` and `common/fp32_gemm.cpp`: `fp32_gemm_serial` and `fp32_gemm_omp` (SPEC 7). Loop order i, k, j. OpenMP only over i. Compiled with `-ffp-contract=off`.
 4. `common/gen_data.cpp`: SPEC 4.2 to 4.4. Takes `--M --K --N --true-pct --data-dir`.
 5. `common/compare_c.cpp`: `compare_c a.f32 b.f32 <count>` prints the number of elements whose bit patterns differ, the maximum absolute difference, and the FNV-1a checksum of each file.
@@ -52,7 +52,7 @@ Write `docs/env_cpu.md`. Questions you must ask at this point, each with a propo
 
 **Stop here.** Tell the human to push `common/` so Lane B can start testing, and give the commands to build and run the generator on ARC. Wait for the human to say continue.
 
-8. `cpu/util.h` and `cpu/util.cpp`: file reading, FNV-1a, statistics (median, min, max, population standard deviation), CSV writing, `rel_err`, `outlier_recall`.
+8. `cpu/util.h` and `cpu/util.cpp`: file reading, statistics (median, min, max, population standard deviation), CSV writing, `rel_err` (SPEC 17.3), `outlier_recall`. FNV-1a comes from `common/checksum.h` (SPEC 17.1).
 9. `cpu/select.cpp`: Step 1.
 10. `cpu/quant.cpp`: Step 2 for the normal channels, the outlier channels, and the per-tensor case. Gathering and packing in whatever layout your AVX2 loop needs.
 11. `cpu/pertensor.cpp`: `int8_pertensor`.
@@ -61,9 +61,9 @@ Write `docs/env_cpu.md`. Questions you must ask at this point, each with a propo
 14. `cpu/fused_avx2.cpp`: Steps 3, 4, 5 in one loop nest.
 15. `cpu/bench_cpu.cpp`: command line (SPEC 11), loading the data files, running the variant with the warmup and timing loop (SPEC 8), stage timers, the CSV row, `--write-c`.
 16. `cpu/Makefile`.
-17. `scripts/cpu/write_env.sh`, `scripts/cpu/run_golden.sh`, and the group scripts of Round 3 are written in their own rounds, not now.
+17. `scripts/cpu/write_env.sh` and `scripts/cpu/run_golden.sh` are written at the start of Round 2 (SPEC 17.7), and the group scripts of Round 3 in Round 3, not now.
 
-Give the build and golden-test commands for ARC. Ask the human to paste the build output and the output of one small run per variant on the golden shape.
+Give the build commands and plain per-variant commands for one small run on the golden shape (SPEC 17.7). Ask the human to paste the build output and the output of one small run per variant on the golden shape.
 
 ## Technical notes (all of these are facts; follow them)
 
@@ -73,16 +73,16 @@ Give the build and golden-test commands for ARC. Ask the human to paste the buil
 - Step 4 order must stay ascending over channels, per output element. Vectorize across output columns j, never across channels.
 - Do not use OpenMP reductions on floating-point values. A thread owns whole rows or (row, column-block) tiles. For skinny shapes (M = 16 or 128) tiles over (i, j-block) keep more threads busy.
 - Set the thread count with `omp_set_num_threads(--threads)`. The job scripts set `OMP_PROC_BIND=close` and `OMP_PLACES=cores`.
-- Allocate aligned buffers (64 bytes) before timing.
+- Allocate aligned buffers (64 bytes) before timing. Allocation, zero-fills done once at allocation or setup, and any one-time setup are outside every timed region; anything done in every repetition to produce the packed, gathered or transposed arrays is timed inside `t_quant_ms` (SPEC 8).
 - Never rely on compiler auto-vectorization in `int8_scalar.cpp`; its flags disable it on purpose.
 
 ## Round 3: job scripts
 
-Groups A, B, C, D of COVERAGE section 2 (CPU lane), one script each: `scripts/cpu/run_A_baselines.sh`, `run_B_sweep.sh`, `run_C_ladder.sh`, `run_D_scaling.sh`. Each script: writes the env file first (SPEC 14), loops over configurations, and appends to `results/cpu/<group>.csv`. Add the submission wrapper that matches the scheduler found in Round 0. Start with a tiny smoke job (golden shape, a few configurations) before the full groups.
+Groups A, B, C, D of COVERAGE section 2 (CPU lane), one script each: `scripts/cpu/run_A_baselines.sh`, `run_B_sweep.sh`, `run_C_ladder.sh`, `run_D_scaling.sh`. Each script: writes the env file first (SPEC 14), loops over configurations, and appends to `results/cpu/<group>.csv` (file names: COVERAGE section 2). Add the submission wrapper that matches the scheduler found in Round 0. Start with a tiny smoke job (golden shape, a few configurations) before the full groups.
 
 ## Round 5 (CPU specifics)
 
-Profiling tools only if Round 0 found them (`perf` is the likely candidate). If no profiler exists, the stage columns plus compiler vectorization reports are the evidence; say so and ask the human before relying on that.
+Profiling tools only if Round 0 found them (`perf` is the likely candidate). If no profiler exists, the stage columns plus compiler vectorization reports are the evidence; say so and ask the human before relying on that. The group E script is `scripts/cpu/run_E_opt.sh`. Re-run the golden check for `<variant>_opt1` and with the base variant's parameters (p in {0, 2, 10}, threads in {1, T}) and append its lines to `checksums_cpu.txt` (SPEC 13 step 6).
 
 ## Round 6
 
