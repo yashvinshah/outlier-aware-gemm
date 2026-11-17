@@ -275,3 +275,22 @@ Tensor cores, cuBLASLt, CUTLASS, INT4, FP8, real model weights or activations, p
 ## 16. Change control
 
 SPEC.md changes only by agreement of both humans. After a change, both sessions are told, and any affected results are re-run.
+
+## 17. Clarifications (added Nov 17, 2026; answers to Lane A's spec review; binding on both lanes)
+
+The numbers follow the order of Lane A's review list.
+
+1. **Constants outside `params.h`.** `params.h` stays exactly as in section 4.1. Other fixed constants (pi, 2^53, the integer clamp bound 127, the 64-byte alignment) are named `constexpr` values in the file that uses them. FNV-1a lives in one header, `common/checksum.h` (header-only, inline functions, written by Lane A in the first `common/` drop). `gen_data`, `compare_c`, `cpu/util` and `gpu/util` all include it, so the checksums cannot differ between lanes.
+2. **FP16 outlier values.** Rounding an FP32 value to FP16 and storing the result back as a float is allowed. It is numerically identical to storing the half. This is how `cpu/int8_scalar.cpp` (built without `-mf16c`) gets its inputs: the quantize stage rounds and stores floats.
+3. **Order of the `rel_err` accumulation.** Serial, on the host, row-major, ascending element index. Two separate double accumulators: numerator = sum of (C - R)^2, denominator = sum of R^2. `rel_err = sqrt(num) / sqrt(den)`. Both lanes use exactly this, so `rel_err` can be compared for exact equality. On the GPU lane, C is copied to the host after timing and the sum is computed on the host.
+4. **OpenMP in select and quantize (CPU lane).** Yes. The `--threads` value applies to every stage. No floating-point reductions across threads: column max, row max and column max (scales) are exact, so any order is fine. Quantize and pack are parallel over rows or channels.
+5. **Golden checksum lines.** `fp32_*` and `int8_pertensor` use `p=NA`. Output C files go to `data/golden_out/cpu/` and `data/golden_out/gpu/` (git-ignored). They are named `<variant>_threads<n>_p<p>.f32` for CPU and `<variant>_tile<n>_p<p>.f32` for GPU, with `pNA` when p does not apply. Only the checksum files under `results/<lane>/golden/` are committed. On a mismatch, the humans copy only the files in question (SPEC 13 step 5).
+6. **Golden data.** The golden shape uses t = 2 only (and W_256x256). Every other shape gets all three t values.
+7. **When the helper scripts are written.** `write_env.sh` and `run_golden.sh` are written at the start of Round 2. Round 1 only gives plain per-variant commands for a first small run.
+8. **CSV formats for the remaining columns.** `true_out_pct` and `iso_out_pct` are printed with `%g`. `M`, `K`, `N`, `k_isolated`, `threads`, `tile`, `warmups` and `reps` are integers. The file tag for t is the `--true-pct` string with "." replaced by "p" (0.5 -> `0p5`, 2 -> `2`, 5 -> `5`).
+9. **Warmups and reps for golden and smoke runs.** Same defaults as SPEC 8 (3 and 10; 1 and 3 for `fp32_serial` and `mixed_sep_scalar`).
+10. **S1 (`rel_err` of `fp32_serial` = 0).** It relies on `fp32_serial` and `fp32_omp` being bit-identical. Both live in the same file with the same flags, and each output element sums over k in the same order. Round 2 verifies it. If the value is not exactly 0, stop and report; do not loosen the check.
+11. **Run time limits.** Round 0c asks for the scheduler's maximum walltime. `fp32_serial` at sq4096 is about 137 GFLOP on one thread and may be the longest single run. If a group does not fit in the limit, split it into one job per shape.
+12. **Which variant gets `_opt1`.** Decided in Round 5 from the profile data and approved by the humans before any code is written.
+13. **Git in the env script.** The job scripts may call `git rev-parse HEAD`. The humans run the scripts on ARC. The ban in CLAUDE.md rule 1 applies to Claude Code itself, which never runs git.
+14. **Aligned allocation.** `posix_memalign` with 64-byte alignment (CPU lane). Confirm on the first ARC build.
