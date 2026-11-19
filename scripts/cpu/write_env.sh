@@ -38,7 +38,11 @@ section() {
     section "g++ --version"
     g++ --version
     section "loaded modules"
+    # Lmod's init script reads variables that may be unset (it failed on LD_PRELOAD), so "set -u"
+    # is switched off around the call.
+    set +u
     module list 2>&1 || echo "module command not available in this shell"
+    set -u
     section "git commit (git rev-parse HEAD)"
     git -C "$REPO_DIR" rev-parse HEAD 2>&1
     # The commands make would run, which shows the exact flags the Makefiles use (CHECK: -n -B).
