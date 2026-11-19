@@ -77,7 +77,8 @@ Stats compute_stats(const double* v, int n) {
     std::copy(v, v + n, s);
     std::sort(s, s + n);
     Stats st;
-    // SPEC 8 does not define the median for an even count; the mean of the two middle values is used.
+    // SPEC 8 does not define the median for an even count; the human's ruling of 2026-11-19 (to be
+    // recorded as SPEC 17.16) is the mean of the two middle values.
     st.median = (n % 2 == 1) ? s[n / 2] : (s[n / 2 - 1] + s[n / 2]) / 2.0;
     st.min = s[0];
     st.max = s[n - 1];
