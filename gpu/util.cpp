@@ -53,7 +53,7 @@ Stats compute_stats(const std::vector<double>& v) {
     return r;
 }
 
-// SPEC 17.3: serial, ascending index, two double accumulators.
+// SPEC 17.3 and 17.15: serial, ascending index, two double accumulators, operands widened before subtracting.
 double rel_err(const float* C, const float* R, size_t n) {
     double num = 0.0, den = 0.0;
     for (size_t i = 0; i < n; i++) {
