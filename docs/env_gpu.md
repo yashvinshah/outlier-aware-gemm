@@ -55,4 +55,4 @@ Answers to the questions above. They are the human's word, not pasted output.
 - Q7: `--exclusive` is allowed and is used for timing runs.
 - Q8: no node pinning.
 - Q9: no answer needed now. Profiler use is decided in Round 5.
-- Q1 (`REPO_DIR`): still open, pending the clone on ARC.
+- Q1 (`REPO_DIR`): `/home/ynshah/outlier-aware-gemm` (from `pwd` after the clone on the login node, 2026-11-17). Remote branches seen by `git branch -a`: `main`, `cpu`, `yashvi_gpu`.
