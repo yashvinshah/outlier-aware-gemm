@@ -1,8 +1,8 @@
-date: Thu Nov 19 17:19:56 EST 2026
+date: Thu Nov 19 17:32:12 EST 2026
 hostname: c5
 nproc: 16
 cpu_model: Model name:          AMD EPYC 9115 16-Core Processor
-slurm_job_id: 343827
+slurm_job_id: 343837
 slurm_node_name: c5
 slurm_job_nodelist: c5
 slurm_job_num_nodes: 1
@@ -25,7 +25,7 @@ CPU family:          26
 Model:               2
 Model name:          AMD EPYC 9115 16-Core Processor
 Stepping:            1
-CPU MHz:             2600.000
+CPU MHz:             4130.697
 CPU max MHz:         4115.8198
 CPU min MHz:         1500.0000
 BogoMIPS:            5199.87
@@ -45,10 +45,17 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 
 ## loaded modules
-/opt/ohpc/admin/lmod/lmod/init/bash: line 93: LD_PRELOAD: unbound variable
+
+Currently Loaded Modules:
+  1) autotools      4) hwloc/2.7.2        7) openmpi4/4.1.6
+  2) prun/2.2       5) ucx/1.15.0         8) cuda
+  3) gnu12/12.4.0   6) libfabric/1.19.0   9) ohpc
+
+ 
+
 
 ## git commit (git rev-parse HEAD)
-6832f0a5294474568244ff593ceab820212c14aa
+341be0fd417fb89cb733db53fbe47f5823fa4865
 
 ## build commands, common/ (make -n -B)
 make: Entering directory '/home/apethan/outlier-aware-gemm/common'
