@@ -1,0 +1,6 @@
+/data/
+*.o
+bench_cpu
+gen_data
+compare_c
+.DS_Store

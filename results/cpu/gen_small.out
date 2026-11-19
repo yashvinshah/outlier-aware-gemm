@@ -1,0 +1,39 @@
+SHAPE golden
+CHECKSUM X_256x256_t2.f32 1f4b3c13a2716d77
+CHECKSUM W_256x256.f32 27a0b2bb320e7f60
+CHECKSUM ref_256x256x256_t2.f32 845c16baf16fdc73
+CHECKSUM outliers_K256_t2.i32 331d6c9a8e908512
+
+real	0m0.452s
+user	0m0.080s
+sys	0m0.004s
+SHAPE sq1024
+CHECKSUM X_1024x1024_t0p5.f32 fcd0338b6c378690
+CHECKSUM W_1024x1024.f32 47d7e8eb0adcdce7
+CHECKSUM ref_1024x1024x1024_t0p5.f32 9151d7efbf4ccc81
+CHECKSUM outliers_K1024_t0p5.i32 a4ca74146f0ebb16
+CHECKSUM X_1024x1024_t2.f32 64c14e7b83df0397
+CHECKSUM W_1024x1024.f32 47d7e8eb0adcdce7
+CHECKSUM ref_1024x1024x1024_t2.f32 df81cc2c55b06822
+CHECKSUM outliers_K1024_t2.i32 85b9362e50f1d740
+CHECKSUM X_1024x1024_t5.f32 88136c184271172f
+CHECKSUM W_1024x1024.f32 47d7e8eb0adcdce7
+CHECKSUM ref_1024x1024x1024_t5.f32 bc4a40ca874129e8
+CHECKSUM outliers_K1024_t5.i32 8e9d38939869bf0b
+
+real	0m1.484s
+user	0m0.674s
+sys	0m0.016s
+2
+
+ Performance counter stats for 'true':
+
+           193,694      cycles:u                                                    
+           218,263      instructions:u            #    1.13  insn per cycle         
+
+       0.002225811 seconds time elapsed
+
+       0.000000000 seconds user
+       0.001098000 seconds sys
+
+
