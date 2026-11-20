@@ -1,0 +1,12 @@
+c27
+16
+Thread(s) per core:  1
+Core(s) per socket:  16
+Socket(s):           1
+NUMA node(s):        1
+Model name:          AMD EPYC 9115 16-Core Processor
+NUMA node0 CPU(s):   0-15
+avx2
+avx512f
+f16c
+fma
