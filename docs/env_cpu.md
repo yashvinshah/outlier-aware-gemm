@@ -1,0 +1,75 @@
+# env_cpu.md: ARC environment facts for Lane A (CPU)
+
+Every row comes from output the human pasted. Source column names the command and, where known, the Slurm job. Nothing here is inferred except where the Notes column says "computed".
+
+## Facts
+
+| # | Fact | Value | Source |
+|---|---|---|---|
+| 1 | Login node kernel | Linux 4.18.0-553.184.1.el8_10.x86_64 | `uname -a` on login2 |
+| 2 | OS release line printed | `PLATFORM_ID="platform:el8"` (only this line was pasted) | `cat /etc/os-release` |
+| 3 | Shell | /bin/bash | `echo "$SHELL"` |
+| 4 | gcc, g++ | 12.4.0, path /opt/ohpc/pub/compiler/gcc/12.4.0/bin | `which`, `gcc --version`, `g++ --version` (login); `g++ --version` in job 342486 |
+| 5 | git | /usr/bin/git | `which` |
+| 6 | Scheduler | Slurm: `sbatch`, `srun`, `salloc` exist; `qsub` does not | `which` |
+| 7 | `perf` | not found in PATH on the login node; `/usr/bin/perf`, `/usr/bin/gprof` and `/usr/bin/valgrind` exist on c3 (row 27) | `which` on login2; batch job 342493 |
+| 8 | Python | 3.6.8 at /usr/bin/python3 | `python3 --version`, `which` |
+| 9 | pandas | not installed on ARC (`ModuleNotFoundError`); Round 6 analysis runs on the human's own machine, not on ARC | `python3 -c "import pandas, matplotlib ..."`; human answer 8 |
+| 10 | Module system | works on the login node; `gnu12/12.4.0`, `ohpc`, `autotools`, `cuda`, `hwloc/2.7.2`, `libfabric/1.19.0`, `ucx/1.15.0`, `prun/2.2`, `openmpi4/4.1.6` marked loaded | `module avail` |
+| 11 | Profiling-related modules listed | `likwid/5.2.2` and `papi/6.0.0` are listed by `module avail` on the login node (listed only; not loaded or tested) | `module avail 2>&1 \| grep -i -E "likwid\|papi"` on login2 |
+| 12 | Partition `normal` | TIMELIMIT 1-00:00:00 (batch limit as listed by sinfo) | `sinfo` |
+| 13 | Interactive `srun` on `normal` | limited to 6 hours | `slurm_job_submit` message from every srun |
+| 14 | Slurm flags accepted on `normal` | `--partition`, `--exclusive`, `--time` (minutes), `--nodes=1` | `sbatch --help`; jobs 342481 to 342487 |
+| 15 | Node-selection flags that exist | `-w, --nodelist=hosts...`, `-C, --constraint=list`, `-x, --exclude=hosts...` | `sbatch --help \| grep -i -E "nodelist\|constraint\|exclude"` |
+| 16 | Home filesystem | 10.1.1.10:/home, 91T size, 79T available | `df -h $HOME` |
+| 17 | Home quota | 943M used; quota 39936M; limit 40960M; 2118 files | `quota -s` |
+| 18 | Login node CPU | Intel Xeon Silver 4110, 2 sockets x 8 cores, 1 thread per core, nproc 16; avx2, avx512f, f16c, fma present; 93Gi RAM | `lscpu`, `nproc`, `free -h` on login2 |
+| 19 | Compute node c3 CPU | AMD EPYC 9115 16-Core, 1 socket x 16 cores, 1 thread per core, 1 NUMA node, nproc 16, L1d 48K, L2 1024K, L3 32768K | `lscpu`, `nproc` in job 342487 |
+| 20 | Compute node c1 | nproc 16, 125Gi RAM total | jobs 342481 (hostname), 342483 (nproc), 342484 (free) |
+| 21 | CPU flags on a compute node | avx2, avx512f, f16c, fma present (node name not printed by that job); confirmed on c3 in row 27 | job 342485 |
+| 22 | Nodes differ | login2 is a Xeon with 93Gi; c3 is an EPYC; the jobs ran on at least two different nodes (c1, c3) | rows 18 to 20 |
+| 23 | Exclusive allocation | accepted: `--exclusive` ran without error on `normal` | jobs 342481 to 342487 |
+| 24 | c3 in sinfo | c3 is listed in partitions `normal*`, `max`, `all`, `class`, `turin`, `rtx4060ti16g`; STATE `allocated`; CPUS 16 | `sinfo -N -n c3 -o "%N %P %T %c"` on login2 |
+| 25 | Job 342492 (pinned to c3 with `--nodelist=c3`) | printed "queued and waiting for resources", then `Killed`; no hostname, nproc or lscpu output | `srun --partition=normal --nodelist=c3 --exclusive --time=1 --nodes=1 bash -c '...'`. Cause unknown. |
+| 26 | Job 342482 | allocated, then `Killed` (lscpu on a compute node, no output). `squeue` later showed it still running on c1 after 22:22 despite `--time=5`; 342492 was still pending. Both were cancelled by the human. The `Killed` message came from the `srun` client; the allocation outlived it. Cause unknown. | `srun ... lscpu`, `squeue -u apethan` |
+| 27 | Batch probe pinned to c3 (job 342493: `sbatch --partition=normal --nodelist=c3 --exclusive --time=1 --nodes=1 --wrap=...`) | hostname c3; nproc 16; 1 thread per core, 16 cores per socket, 1 socket, 1 NUMA node (CPUs 0-15); AMD EPYC 9115 16-Core; flags avx2, avx512f, f16c, fma present; `/usr/bin/perf`, `/usr/bin/gprof`, `/usr/bin/valgrind` exist. The job waited in the queue (reason `ReqNodeNotAvail`, then `Resources`) before running. | `cat $HOME/c3_probe.out` |
+| 28 | `--wrap`, `--output` and `--nodelist` | accepted by `sbatch` (job 342493 ran and wrote the output file) | job 342493 |
+| 29 | What occupied c3 | an array task (`342572_6`, partition `rtx4060ti`, another user's job) running for 2:33:04; c3 STATE `allocated`, REASON `none` (not down). Job 342852, the human's data-generation job pinned to c3, was `PD (Resources)`. | `squeue -w c3`, `sinfo -N -n c3 -o "%N %T %E"`, `squeue -u apethan` |
+| 30 | Partition `turin` | 22 nodes listed, all with 16 CPUs: c0 to c10, c27, c29, c50 to c56, c58, c59. States at that time: allocated c0 to c6, c29, c58; idle the rest. The memory column printed `1` for every node and is not usable. | `sinfo -N -p turin -o "%N %T %c %m"` |
+| 31 | Probe on a free `turin` node, no `--nodelist` (batch job, `--partition=turin --exclusive --time=1 --nodes=1`) | hostname c27; nproc 16; 1 thread per core, 16 cores per socket, 1 socket, 1 NUMA node (CPUs 0-15); AMD EPYC 9115 16-Core; flags avx2, avx512f, f16c, fma present. Same CPU model, core count and flags as c3. | `cat $HOME/turin_probe.out` |
+| 32 | c27 is not in partition `normal` | the first `sinfo` listed `normal` as alloc c[0,2,6,16-17,23-24,33,54-55,63-65,67-72] and idle c[1,3-5,7-15,18-22,25-26,34-36,39-48,50-53,56-58,60-62,66,73-79]; c27 is in neither list. It is listed under `all`, `qc`, `turin` and `rtx6000`. The account can run exclusive batch jobs on `turin` (row 31). Partition `turin` TIMELIMIT is 1-00:00:00. | first `sinfo` output; job in row 31 |
+| 33 | perf on c27 | `/proc/sys/kernel/perf_event_paranoid` is 2. `perf stat -e cycles,instructions true` ran and printed `cycles:u` and `instructions:u` (the `:u` suffix means user-space counts), 193,694 cycles and 218,263 instructions for `true`. | job 342856, `$HOME/gen_small.out` |
+| 34 | Build of `common/` on the login node | `make -C common clean` then `make` printed the two `g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off` lines and no warnings or errors (no `-Wall` is used, so this says only that it compiled). | human's paste after `clean` |
+| 35 | Data generation timing on c27 (`bash scripts/cpu/gen_all_data.sh $REPO_DIR/data golden sq1024`) | golden (1 call): real 0m0.452s, user 0m0.080s. sq1024 (3 calls, t = 0.5, 2, 5): real 0m1.484s, user 0m0.674s. The sq1024 W checksum is `47d7e8eb0adcdce7` in all three calls. | job 342856, `$HOME/gen_small.out` |
+| 36 | Data generation timing on c27, remaining shapes (`--time=6`, nodelist c27, partition turin) | real (3 calls each): sq2048 3.653 s, sq4096 12.763 s, skinny16 4.230 s, skinny128 4.517 s; sum 25.163 s (computed). user: 3.042, 48.733, 1.754, 2.866 s. All four shapes finished inside the limit. The `W_4096x4096.f32` checksum is `59310dfb4da3f7d6` in all nine calls of sq4096, skinny16 and skinny128, and the `outliers_K4096_t*` checksums are equal across those three shapes for each t. | `$HOME/gen_full.out` |
+| 37 | Why c27 was unavailable | job 343662 in partition `rtx6000` RUNNING on c27 for 4:18:35 of a 4-00:00:00 limit (at most 3 days 19:41:25 left, computed). `sinfo -T` printed "No reservations in the system". The human's smoke job 343805 pinned to c27 showed `PD (ReqNodeNotAvail, May be reserved for other job)`. | `squeue -w c27 -o "%i %P %T %M %l %R"`, `sinfo -T`, `squeue -u apethan` |
+| 38 | `turin` node states at that time | idle: c5, c7, c9, c10; all other `turin` nodes allocated; reason `none` for every node | `sinfo -N -p turin -o "%N %T %E"` |
+| 39 | Probes of idle `turin` nodes (batch, `--partition=turin --nodelist=<node> --exclusive --time=2 --nodes=1`) | c5, c9 and c10 each printed: nproc 16; 1 thread per core, 16 cores per socket, 1 socket, 1 NUMA node (CPUs 0-15); AMD EPYC 9115 16-Core; flags avx2, avx512f, f16c, fma. Same as c3 and c27. For c7 no output file existed (`probe_c7.out`: No such file or directory); c7 is unverified. | `cat $HOME/probe_c5.out $HOME/probe_c7.out $HOME/probe_c9.out $HOME/probe_c10.out` |
+| 40 | Build of `cpu/bench_cpu` on the login node | `make -C cpu` printed the nine `g++` compile lines (SPEC 12 flags; `int8_scalar.cpp` with the scalar flags) and the link line; no errors or warnings were printed. The F16C intrinsics, `posix_memalign` and `roundf` therefore compile with g++ 12.4.0. | human's paste of `make -C $REPO_DIR/cpu` |
+| 41 | First small run on node c5 (job 343818, golden shape, t = 2, p = 2 for mixed, 16 threads except fp32_serial) | the output printed c5, 16, EPYC 9115 16-Core, 1 thread per core, 16 cores per socket. `C_CHECKSUM`: fp32_serial and fp32_omp both `845c16baf16fdc73` (equal to the `ref_256x256x256_t2.f32` line in `results/cpu/data_checksums.txt`); int8_pertensor `5f81c868aa1990b3`; mixed_sep_scalar, mixed_sep_avx2 and mixed_fused_avx2 all `c611d2aaa379885a`. | `$HOME/smoke_golden.out`, `$HOME/smoke_golden.csv` |
+| 42 | Slurm and tool facts from `env_golden.txt` (job 343827 on c5) | `SLURM_JOB_ID` 343827, `SLURMD_NODENAME` c5, `SLURM_JOB_NODELIST` c5, `SLURM_JOB_NUM_NODES` 1, `SLURM_CPUS_ON_NODE` 16 are all set inside a batch job. `OMP_PROC_BIND` close and `OMP_PLACES` cores were set. `make -n -B` printed the build commands with the SPEC 12 flags. `lscpu`: AMD EPYC 9115, 16 cores, 1 thread per core, CPU MHz 2600, L2 1024K, L3 32768K, flags include avx2, f16c, fma, avx512f. | `results/cpu/env_golden.txt` on ARC |
+| 43 | `module list` inside `write_env.sh` | failed under `set -u` with `/opt/ohpc/admin/lmod/lmod/init/bash: line 93: LD_PRELOAD: unbound variable`, so the loaded modules were not recorded in the first `env_golden.txt`. Fixed by switching `set -u` off around the call. The human reports that a second golden run listed the loaded modules in `env_golden.txt` and that all 22 checksums equalled the first run (reported, not pasted). | `results/cpu/env_golden.txt` on ARC |
+| 44 | Golden job (`run_golden.sh`, 22 runs) | elapsed seconds 4 (printed by the script) | `$HOME/golden_cpu.out` |
+| 45 | Smoke job 343842 (`run_smoke.sh` on golden, sq1024, sq2048; 39 runs; `submit.sh`, 15 minutes requested) on c5 | the script printed "elapsed seconds: 28". `write_env.sh` listed the loaded modules (`autotools`, `hwloc/2.7.2`, `openmpi4/4.1.6` among them) inside the batch job. Per-config wall times at 16 threads, p = 5: mixed_sep_avx2 0.06 s (sq1024), 0.30 s (sq2048); mixed_sep_scalar at 1 thread 1.51 s (sq1024), 12.39 s (sq2048). | `$HOME/run_smoke_20261119_173745.out`, `data/smoke/smoke.csv`, `results/cpu/env_smoke.txt` |
+
+## Answers from the human (Round 0c)
+
+| # | Answer |
+|---|---|
+| 1 | `REPO_DIR=$HOME/outlier-aware-gemm` |
+| 2 | `data/` at `$REPO_DIR/data` |
+| 3 | T = 16, valid only on c3 (extended to c27 by answer 4b, because row 31 shows the same CPU) |
+| 4 | Pin all CPU jobs to c3; wait limit before reconsidering is 30 minutes. Probe finished (rows 15, 24, 27). |
+| 4b | Changed: pin all CPU jobs to c27 with `--partition=turin` (not c3, which another user's job occupied; rows 29 to 32). The human cancels the queued c3 job 342852. The human tells Yashvi not to pin c27 (her node is unknown to me). |
+| 4c | Changed again: use exactly one node for all CPU jobs, no `--exclude` set and no node-hopping. The node is c5, chosen from the verified matches in row 39 and confirmed by the human. If c5 is busy at submit time, the human tells me and the fallbacks are c9, then c10. No reservation or hold, and no request to the ARC admins. |
+| 5 | `--exclusive` on every job |
+| 6 | Submit each group with `sbatch` and `--partition=normal --exclusive --nodes=1`; set `OMP_PROC_BIND=close` and `OMP_PLACES=cores` inside the script; record CPU affinity (`nproc`) in each env file |
+| 7 | Split a group per shape only if it exceeds its estimate or the limit. Request each job's walltime from the smoke-run extrapolation (about 2x margin), not the 1-day maximum. One job per group. |
+| 8 | Round 6 analysis runs on the human's own machine; all ARC scripts are bash-only; pandas and matplotlib are confirmed locally in Round 6 |
+| 9 | Deferred; the addendum probe covers which profiler tools exist (row 27: `perf`, `gprof`, `valgrind` exist on c3) |
+
+## Still open
+
+1. c3 is shared with other users' jobs (rows 24 and 29), so every `--exclusive` job pinned to c3 may wait in the queue before it starts. I cannot see how long. c27 has the same CPU model (row 31); whether to pin all CPU jobs to c27 instead (which needs `--partition=turin`, row 32) was decided: pin to c27 (answer 4b).
+2. Use batch jobs (`sbatch`), not interactive `srun`, for anything that may queue: a killed `srun` client left allocations running (row 26).
+3. `perf stat` works for this account on c27 for user-space counts only (row 33, paranoid level 2). Whether other events work (cache misses, for example) is not tested.
