@@ -1,6 +1,7 @@
 /data/
 *.o
 bench_cpu
+bench_gpu
 gen_data
 compare_c
 .DS_Store
