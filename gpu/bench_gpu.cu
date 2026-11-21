@@ -18,7 +18,7 @@ constexpr double ROUND_HALF      = 0.5;
 constexpr double FLOP_PER_MAC    = 2.0;  // SPEC 9: gflops = 2 * M * K * N / (total_ms_median * 1e6)
 constexpr double GFLOPS_DIVISOR  = 1e6;
 
-enum Variant { V_FP32_CUBLAS, V_PERTENSOR, V_MIXED_SEP, V_MIXED_FUSED };
+enum Variant { V_FP32_CUBLAS, V_PERTENSOR, V_MIXED_SEP, V_MIXED_FUSED, V_MIXED_SEP_OPT1 };
 
 struct Args {
     Variant variant;
@@ -49,13 +49,14 @@ struct RepTimes {
     double total;
 };
 
-static bool is_mixed(Variant v) { return v == V_MIXED_SEP || v == V_MIXED_FUSED; }
+static bool is_mixed(Variant v) { return v == V_MIXED_SEP || v == V_MIXED_FUSED || v == V_MIXED_SEP_OPT1; }
 
 static Variant parse_variant(const char* name) {
     if (strcmp(name, "fp32_cublas") == 0) return V_FP32_CUBLAS;
     if (strcmp(name, "int8_pertensor") == 0) return V_PERTENSOR;
     if (strcmp(name, "mixed_sep") == 0) return V_MIXED_SEP;
     if (strcmp(name, "mixed_fused") == 0) return V_MIXED_FUSED;
+    if (strcmp(name, "mixed_sep_opt1") == 0) return V_MIXED_SEP_OPT1;
     die("unknown variant", name);
 }
 
@@ -235,7 +236,8 @@ static RepTimes rep_mixed_sep(Ctx& c) {
     select_and_quantize(c, r);
     // With k = 0 the INT8 result is C itself and steps 4 and 5 are skipped (SPEC 6).
     double t = stage_start_ms();
-    run_int8_gemm(c.tile, c.d, c.dm, c.dm.k > 0 ? c.d.Ci8 : c.d.C);
+    auto int8_gemm = (c.variant == V_MIXED_SEP_OPT1) ? run_int8_gemm_opt1 : run_int8_gemm;
+    int8_gemm(c.tile, c.d, c.dm, c.dm.k > 0 ? c.d.Ci8 : c.d.C);
     r.ms[ST_INT8] = stage_elapsed_ms(t);
     if (c.dm.k == 0) return r;
     t = stage_start_ms();
@@ -261,7 +263,7 @@ static RepTimes run_rep(Ctx& c) {
     RepTimes r;
     if (c.variant == V_FP32_CUBLAS) return rep_cublas(c);
     if (c.variant == V_PERTENSOR) r = rep_pertensor(c);
-    else if (c.variant == V_MIXED_SEP) r = rep_mixed_sep(c);
+    else if (c.variant == V_MIXED_SEP || c.variant == V_MIXED_SEP_OPT1) r = rep_mixed_sep(c);
     else r = rep_mixed_fused(c);
     r.total = 0.0;
     for (int s = 0; s < NUM_STAGES; s++) r.total += r.ms[s];

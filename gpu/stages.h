@@ -50,6 +50,7 @@ void run_quantize(const DevBuffers& d, const Dims& dm);
 void run_pack(const DevBuffers& d, const Dims& dm);
 void run_quantize_pertensor(const DevBuffers& d, const Dims& dm);
 void run_int8_gemm(int tile, const DevBuffers& d, const Dims& dm, float* out);
+void run_int8_gemm_opt1(int tile, const DevBuffers& d, const Dims& dm, float* out);
 void run_outlier(int tile, const DevBuffers& d, const Dims& dm);
 void run_merge(int tile, const DevBuffers& d, const Dims& dm);
 void run_fused(int tile, const DevBuffers& d, const Dims& dm);
