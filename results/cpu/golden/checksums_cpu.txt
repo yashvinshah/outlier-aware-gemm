@@ -20,3 +20,9 @@ mixed_fused_avx2 threads=1 p=10 5211561ff29d762e
 mixed_sep_scalar threads=16 p=10 5211561ff29d762e
 mixed_sep_avx2 threads=16 p=10 5211561ff29d762e
 mixed_fused_avx2 threads=16 p=10 5211561ff29d762e
+mixed_sep_avx2_opt1 threads=1 p=0 25df7ddb655c5cb7
+mixed_sep_avx2_opt1 threads=16 p=0 25df7ddb655c5cb7
+mixed_sep_avx2_opt1 threads=1 p=2 c611d2aaa379885a
+mixed_sep_avx2_opt1 threads=16 p=2 c611d2aaa379885a
+mixed_sep_avx2_opt1 threads=1 p=10 5211561ff29d762e
+mixed_sep_avx2_opt1 threads=16 p=10 5211561ff29d762e
