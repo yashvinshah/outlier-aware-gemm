@@ -1,0 +1,17 @@
+# started on Fri Nov 20 11:59:24 2026
+
+
+ Performance counter stats for '/home/apethan/outlier-aware-gemm/cpu/bench_cpu --variant mixed_sep_avx2 --shape sq4096 --M 4096 --K 4096 --N 4096 --true-pct 2 --iso-pct 0 --threads 16 --warmups 3 --reps 10 --data-dir /home/apethan/outlier-aware-gemm/data --out-csv /home/apethan/outlier-aware-gemm/data/perf/perf_runs.csv':
+
+         32,764.95 msec task-clock:u              #   15.141 CPUs utilized          
+    99,251,079,215      cycles:u                  #    3.029 GHz                    
+   327,154,025,687      instructions:u            #    3.30  insn per cycle         
+    31,142,659,723      cache-references:u        #  950.487 M/sec                  
+       445,082,127      cache-misses:u            #    1.429 % of all cache refs    
+
+       2.163928262 seconds time elapsed
+
+      32.669465000 seconds user
+       0.032940000 seconds sys
+
+

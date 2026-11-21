@@ -1,0 +1,56 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 34K of event 'cycles:u'
+# Event count (approx.): 103567755099
+#
+# Overhead  Symbol                                                                                                                        IPC   [IPC Coverage]
+# ........  ............................................................................................................................  ....................
+#
+    78.99%  [.] int8_tile_avx2                                                                                                            -      -            
+    11.99%  [.] outlier_tile_avx2                                                                                                         -      -            
+     1.96%  [.] roundf32                                                                                                                  -      -            
+     1.67%  [.] quantize_x                                                                                                                -      -            
+     1.45%  [.] gomp_team_barrier_wait_end                                                                                                -      -            
+     0.90%  [.] merge_plain                                                                                                               -      -            
+     0.83%  [.] pack_w                                                                                                                    -      -            
+     0.44%  [.] gomp_barrier_wait_end                                                                                                     -      -            
+     0.41%  [.] column_max                                                                                                                -      -            
+     0.41%  [.] row_scales                                                                                                                -      -            
+     0.36%  [.] col_scales                                                                                                                -      -            
+     0.31%  [.] convert_outliers                                                                                                          -      -            
+     0.10%  [.] convert_outliers                                                                                                          -      -            
+     0.05%  [.] rel_err                                                                                                                   -      -            
+     0.04%  [.] int8_gemm_avx2                                                                                                            -      -            
+     0.03%  [.] outlier_gemm_avx2                                                                                                         -      -            
+     0.03%  [.] __memset_avx512_unaligned_erms                                                                                            -      -            
+     0.01%  [k] 0xffffffff89895977                                                                                                        -      -            
+     0.01%  [.] std::__introsort_loop<int*, long, __gnu_cxx::__ops::_Iter_comp_iter<rank_channels(Select*, int)::{lambda(int, int)#1}> >  -      -            
+     0.01%  [k] 0xffffffff89a00e70                                                                                                        -      -            
+     0.01%  [k] 0xffffffff88f485d3                                                                                                        -      -            
+     0.00%  [k] 0xffffffff88f49081                                                                                                        -      -            
+     0.00%  [k] 0xffffffff88ee2ebf                                                                                                        -      -            
+     0.00%  [.] gomp_thread_start                                                                                                         -      -            
+     0.00%  [.] roundf@plt                                                                                                                -      -            
+     0.00%  [.] _dl_relocate_object                                                                                                       -      -            
+     0.00%  [k] 0xffffffff89892091                                                                                                        -      -            
+     0.00%  [.] __GI___tunables_init                                                                                                      -      -            
+     0.00%  [.] __pthread_enable_asynccancel                                                                                              -      -            
+     0.00%  [.] __ctype_init                                                                                                              -      -            
+     0.00%  [.] __sigjmp_save                                                                                                             -      -            
+     0.00%  [.] start_thread                                                                                                              -      -            
+     0.00%  [.] getenv                                                                                                                    -      -            
+     0.00%  [k] 0xffffffff88e70ae0                                                                                                        -      -            
+     0.00%  [.] __clone                                                                                                                   -      -            
+     0.00%  [k] 0xffffffff89a00b40                                                                                                        -      -            
+     0.00%  [.] 0x000000000000b504                                                                                                        -      -            
+     0.00%  [.] gomp_init_affinity                                                                                                        -      -            
+     0.00%  [.] _start                                                                                                                    -      -            
+     0.00%  [.] pthread_setaffinity_np@@GLIBC_2.3.4                                                                                       -      -            
+
+
+#
+# (Tip: Order by the overhead of source file name and line number: perf report -s srcline)
+#

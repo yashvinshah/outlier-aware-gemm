@@ -1,0 +1,49 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 31K of event 'cycles:u'
+# Event count (approx.): 94885781793
+#
+# Overhead  Symbol                                   IPC   [IPC Coverage]
+# ........  .......................................  ....................
+#
+    88.25%  [.] int8_tile_avx2                       -      -            
+     4.77%  [.] roundf32                             -      -            
+     2.49%  [.] quantize_x                           -      -            
+     1.98%  [.] gomp_team_barrier_wait_end           -      -            
+     1.22%  [.] pack_w                               -      -            
+     0.43%  [.] row_scales                           -      -            
+     0.37%  [.] col_scales                           -      -            
+     0.32%  [.] gomp_barrier_wait_end                -      -            
+     0.05%  [.] rel_err                              -      -            
+     0.04%  [.] int8_gemm_avx2                       -      -            
+     0.03%  [k] 0xffffffff89a00e70                   -      -            
+     0.02%  [.] __memset_avx512_unaligned_erms       -      -            
+     0.01%  [k] 0xffffffff88ee2ebf                   -      -            
+     0.01%  [.] gomp_thread_start                    -      -            
+     0.00%  [.] gomp_barrier_wait                    -      -            
+     0.00%  [k] 0xffffffff89a014ed                   -      -            
+     0.00%  [.] vfprintf                             -      -            
+     0.00%  [k] 0xffffffff89892073                   -      -            
+     0.00%  [.] openaux                              -      -            
+     0.00%  [.] do_lookup_x                          -      -            
+     0.00%  [.] __ctype_init                         -      -            
+     0.00%  [.] start_thread                         -      -            
+     0.00%  [.] __GI___tunables_init                 -      -            
+     0.00%  [.] __pthread_enable_asynccancel         -      -            
+     0.00%  [.] getenv                               -      -            
+     0.00%  [k] 0xffffffff89892091                   -      -            
+     0.00%  [.] __clone                              -      -            
+     0.00%  [.] 0x000000000000b504                   -      -            
+     0.00%  [k] 0xffffffff89a00b40                   -      -            
+     0.00%  [.] gomp_init_affinity                   -      -            
+     0.00%  [.] _dl_start                            -      -            
+     0.00%  [.] _start                               -      -            
+     0.00%  [.] pthread_setaffinity_np@@GLIBC_2.3.4  -      -            
+
+
+#
+# (Tip: For a higher level overview, try: perf report --sort comm,dso)
+#
