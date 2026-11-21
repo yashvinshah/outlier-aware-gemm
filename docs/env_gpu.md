@@ -56,3 +56,18 @@ Answers to the questions above. They are the human's word, not pasted output.
 - Q8: no node pinning.
 - Q9: no answer needed now. Profiler use is decided in Round 5.
 - Q1 (`REPO_DIR`): `/home/ynshah/outlier-aware-gemm` (from `pwd` after the clone on the login node, 2026-11-17). Remote branches seen by `git branch -a`: `main`, `cpu`, `yashvi_gpu`.
+
+## Facts added in Rounds 2 and 3 (from `results/gpu/env_*.txt`)
+
+Each row is read from the env file named in the Source column. These add to the table above; none replaces it.
+
+| # | Fact | Value | Source |
+|---|---|---|---|
+| 19 | Nodes used | golden run: `c37` (job 343498); group A: `c41` (job 344194); group B: `c44` (job 344195); group C: `c23` (job 344196). The group jobs were not pinned, so they ran on three different nodes | `env_golden.txt`, `env_A_baselines.txt`, `env_B_sweep.txt`, `env_C_tiles.txt` |
+| 20 | GPU on those nodes | `NVIDIA GeForce RTX 4060 Ti` in all four env files | the `nvidia-smi` section of each |
+| 21 | Driver on those nodes | 580.82.07, CUDA 13.0 shown by `nvidia-smi` in all four env files. Fact 12 recorded 615.71.09 on `c3`; the two values differ and the difference is not explained | the `nvidia-smi` section of each |
+| 22 | CPUs per job | `SLURM_CPUS_ON_NODE=16` and `nproc` 16 (golden env file) although `-c 4` was requested for the interactive allocation | `env_golden.txt`; the group jobs show `SLURM_CPUS_ON_NODE=16` |
+| 23 | Toolchain inside Slurm jobs | `g++ (GCC) 12.4.0` and `nvcc` 13.4, V13.4.92 are found inside the batch jobs without a `module load` (all four env files). This settles open question 6 | the `g++ --version` and `nvcc --version` sections |
+| 24 | Batch time limit | `sbatch` accepted `-t 1-00:00:00` in the three group scripts and the jobs ran. This settles the time-format `CHECK` | job ids 344194 to 344196 and the logs in `results/gpu/logs/` (logs are not in the tree) |
+| 25 | Scheduler variables | `SLURM_JOB_ID`, `SLURM_JOB_PARTITION`, `SLURMD_NODENAME`, `SLURM_JOB_NODELIST`, `SLURM_JOB_NUM_NODES` and `SLURM_CPUS_ON_NODE` all resolved; `module list` worked inside the script | `env_golden.txt` |
+| 26 | Loaded modules | `autotools`, `prun/2.2`, `gnu12/12.4.0`, `hwloc/2.7.2`, `ucx/1.15.0`, `libfabric/1.19.0`, `openmpi4/4.1.6`, `cuda`, `ohpc` | `env_golden.txt` |
