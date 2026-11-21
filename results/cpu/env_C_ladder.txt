@@ -1,0 +1,78 @@
+date: Fri Nov 20 11:15:13 EST 2026
+hostname: c5
+nproc: 16
+cpu_model: Model name:          AMD EPYC 9115 16-Core Processor
+slurm_job_id: 344198
+slurm_node_name: c5
+slurm_job_nodelist: c5
+slurm_job_num_nodes: 1
+slurm_cpus_on_node: 16
+OMP_PROC_BIND: close
+OMP_PLACES: cores
+
+## lscpu
+Architecture:        x86_64
+CPU op-mode(s):      32-bit, 64-bit
+Byte Order:          Little Endian
+CPU(s):              16
+On-line CPU(s) list: 0-15
+Thread(s) per core:  1
+Core(s) per socket:  16
+Socket(s):           1
+NUMA node(s):        1
+Vendor ID:           AuthenticAMD
+CPU family:          26
+Model:               2
+Model name:          AMD EPYC 9115 16-Core Processor
+Stepping:            1
+CPU MHz:             4103.123
+CPU max MHz:         4115.8198
+CPU min MHz:         1500.0000
+BogoMIPS:            5199.87
+Virtualization:      AMD-V
+L1d cache:           48K
+L1i cache:           32K
+L2 cache:            1024K
+L3 cache:            32768K
+NUMA node0 CPU(s):   0-15
+Flags:               fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 invpcid_single hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif v_spec_ctrl avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d
+
+## g++ --version
+g++ (GCC) 12.4.0
+Copyright (C) 2022 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+
+## loaded modules
+
+Currently Loaded Modules:
+  1) autotools      4) hwloc/2.7.2        7) openmpi4/4.1.6
+  2) prun/2.2       5) ucx/1.15.0         8) cuda
+  3) gnu12/12.4.0   6) libfabric/1.19.0   9) ohpc
+
+ 
+
+
+## git commit (git rev-parse HEAD)
+36227bf117e235c20389c04a472144343e7f5a06
+
+## build commands, common/ (make -n -B)
+make: Entering directory '/home/apethan/outlier-aware-gemm/common'
+g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off -o gen_data gen_data.cpp fp32_gemm.cpp
+g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off -o compare_c compare_c.cpp
+make: Leaving directory '/home/apethan/outlier-aware-gemm/common'
+
+## build commands, cpu/ (make -n -B)
+make: Entering directory '/home/apethan/outlier-aware-gemm/cpu'
+g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off -I../common -c -o bench_cpu.o bench_cpu.cpp
+g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off -I../common -c -o util.o util.cpp
+g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off -I../common -c -o select.o select.cpp
+g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off -I../common -c -o quant.o quant.cpp
+g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off -I../common -c -o pertensor.o pertensor.cpp
+g++ -std=c++17 -O2 -fno-tree-vectorize -fno-tree-slp-vectorize -fopenmp -ffp-contract=off -I../common -c -o int8_scalar.o int8_scalar.cpp
+g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off -I../common -c -o int8_avx2.o int8_avx2.cpp
+g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off -I../common -c -o fused_avx2.o fused_avx2.cpp
+g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off -I../common -c -o fp32_gemm.o ../common/fp32_gemm.cpp
+g++ -fopenmp -o bench_cpu bench_cpu.o util.o select.o quant.o pertensor.o int8_scalar.o int8_avx2.o fused_avx2.o fp32_gemm.o
+make: Leaving directory '/home/apethan/outlier-aware-gemm/cpu'
