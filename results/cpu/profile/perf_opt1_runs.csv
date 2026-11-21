@@ -1,0 +1,3 @@
+lane,variant,shape,M,K,N,true_out_pct,iso_out_pct,k_isolated,threads,tile,warmups,reps,t_select_ms,t_quant_ms,t_int8_ms,t_outlier_ms,t_merge_ms,total_ms_median,total_ms_min,total_ms_max,total_ms_stddev,gflops,rel_err,outlier_recall
+cpu,mixed_sep_avx2_opt1,sq4096,4096,4096,4096,2,5,205,16,,3,10,1.031982,9.313671,128.963270,17.680352,1.602845,158.630710,151.639378,159.714362,2.570660,866.408,1.691093012e-03,1.000000
+cpu,mixed_sep_avx2_opt1,sq4096,4096,4096,4096,2,5,205,16,,3,10,1.037187,9.416797,129.816420,17.741751,1.614546,159.729947,152.699287,160.291386,2.152396,860.446,1.691093012e-03,1.000000
