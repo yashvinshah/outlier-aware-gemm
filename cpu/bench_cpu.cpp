@@ -18,7 +18,8 @@ constexpr double FLOPS_PER_MAC = 2.0;   // SPEC 9: gflops = 2 * M * K * N / (tot
 constexpr double GFLOPS_DIVISOR = 1e6;
 
 enum Variant {
-    V_FP32_SERIAL, V_FP32_OMP, V_PERTENSOR, V_MIXED_SEP_SCALAR, V_MIXED_SEP_AVX2, V_MIXED_FUSED_AVX2
+    V_FP32_SERIAL, V_FP32_OMP, V_PERTENSOR, V_MIXED_SEP_SCALAR, V_MIXED_SEP_AVX2, V_MIXED_FUSED_AVX2,
+    V_MIXED_SEP_AVX2_OPT1
 };
 
 struct Config {
@@ -57,6 +58,7 @@ static Variant parse_variant(const std::string& s) {
     if (s == "mixed_sep_scalar") return V_MIXED_SEP_SCALAR;
     if (s == "mixed_sep_avx2") return V_MIXED_SEP_AVX2;
     if (s == "mixed_fused_avx2") return V_MIXED_FUSED_AVX2;
+    if (s == "mixed_sep_avx2_opt1") return V_MIXED_SEP_AVX2_OPT1;
     die("unknown variant", s.c_str());
 }
 
@@ -83,6 +85,8 @@ static void check_config(const Config& c, bool have_variant, bool have_true_pct)
     if (c.variant == V_FP32_SERIAL && c.threads != 1) die("fp32_serial runs one thread", "--threads 1");
     if (c.variant != V_FP32_SERIAL && c.variant != V_FP32_OMP && c.N % COL_BLOCK != 0)
         die("N is not a multiple of COL_BLOCK (cpu/kernels.h)", c.shape.c_str());
+    if (c.variant == V_MIXED_SEP_AVX2_OPT1 && c.M % ROW_BLOCK != 0)
+        die("M is not a multiple of ROW_BLOCK (cpu/kernels.h)", c.shape.c_str());
 }
 
 static Config parse_args(int argc, char** argv) {
@@ -165,6 +169,7 @@ static void setup_workspace(const Config& c, const Problem& p, int k, Workspace*
     w->C = (float*)alloc_aligned(sizeof(float) * (size_t)p.M * p.N);
     if (c.variant == V_PERTENSOR) alloc_pertensor(p, w);
     else if (is_mixed(c.variant)) alloc_mixed(p, k, c.variant != V_MIXED_FUSED_AVX2, w);
+    if (c.variant == V_MIXED_SEP_AVX2_OPT1) w->q.xpk = (int32_t*)alloc_aligned(sizeof(int32_t) * (size_t)p.M * w->q.kp);
 }
 
 static double ms_since(double t0) { return (omp_get_wtime() - t0) * MS_PER_S; }
@@ -193,7 +198,8 @@ static double run_pertensor(const Problem& p, Workspace* w, double* t) {
 }
 
 // Select (skipped when k = 0, so its time stays 0.0) and quantize, shared by both mixed families.
-static void select_and_quantize(const Problem& p, Workspace* w, double* t) {
+// The opt1 variant also packs the X channel pairs (pack_x_pairs); that time counts as quantize time.
+static void select_and_quantize(const Problem& p, Workspace* w, bool pack_x, double* t) {
     if (w->sel.k > 0) {
         const double t0 = omp_get_wtime();
         select_channels(p, &w->sel);
@@ -201,15 +207,18 @@ static void select_and_quantize(const Problem& p, Workspace* w, double* t) {
     }
     const double t1 = omp_get_wtime();
     quantize_mixed(p, w->sel, &w->q);
+    if (pack_x) pack_x_pairs(p, &w->q);
     t[ST_QUANT] = ms_since(t1);
 }
 
-static double run_mixed_sep(bool avx2, const Problem& p, Workspace* w, double* t) {
-    select_and_quantize(p, w, t);
+static double run_mixed_sep(Variant v, const Problem& p, Workspace* w, double* t) {
+    const bool avx2 = (v != V_MIXED_SEP_SCALAR);
+    select_and_quantize(p, w, v == V_MIXED_SEP_AVX2_OPT1, t);
     const int k = w->sel.k;
     float* i8_out = (k > 0) ? w->ci8 : w->C;  // k = 0: C = Ci8 (SPEC 6 step 5)
     double t0 = omp_get_wtime();
-    if (avx2) int8_gemm_avx2(p, w->q, i8_out);
+    if (v == V_MIXED_SEP_AVX2_OPT1) int8_gemm_avx2_opt1(p, w->q, i8_out);
+    else if (avx2) int8_gemm_avx2(p, w->q, i8_out);
     else int8_gemm_scalar(p, w->q, i8_out);
     t[ST_INT8] = ms_since(t0);
     if (k > 0) {
@@ -226,7 +235,7 @@ static double run_mixed_sep(bool avx2, const Problem& p, Workspace* w, double* t
 }
 
 static double run_mixed_fused(const Problem& p, Workspace* w, double* t) {
-    select_and_quantize(p, w, t);
+    select_and_quantize(p, w, false, t);
     const double t0 = omp_get_wtime();
     fused_gemm_avx2(p, w->sel, w->q, w->C);
     t[ST_INT8] = ms_since(t0);  // steps 3, 4 and 5 together (SPEC 8)
@@ -237,12 +246,12 @@ static double run_once(const Config& c, const Problem& p, Workspace* w, double* 
     if (c.variant == V_FP32_SERIAL || c.variant == V_FP32_OMP) return run_fp32(c.variant == V_FP32_OMP, p, w->C);
     if (c.variant == V_PERTENSOR) return run_pertensor(p, w, t);
     if (c.variant == V_MIXED_FUSED_AVX2) return run_mixed_fused(p, w, t);
-    return run_mixed_sep(c.variant == V_MIXED_SEP_AVX2, p, w, t);
+    return run_mixed_sep(c.variant, p, w, t);
 }
 
 // Stage columns that exist for the variant (SPEC 8); the others are written blank.
 static void stage_presence(Variant v, bool* present) {
-    for (int s = 0; s < NUM_STAGES; s++) present[s] = (v == V_MIXED_SEP_SCALAR || v == V_MIXED_SEP_AVX2);
+    for (int s = 0; s < NUM_STAGES; s++) present[s] = (v == V_MIXED_SEP_SCALAR || v == V_MIXED_SEP_AVX2 || v == V_MIXED_SEP_AVX2_OPT1);
     if (v == V_PERTENSOR) present[ST_QUANT] = present[ST_INT8] = true;
     if (v == V_MIXED_FUSED_AVX2) present[ST_SELECT] = present[ST_QUANT] = present[ST_INT8] = true;
 }

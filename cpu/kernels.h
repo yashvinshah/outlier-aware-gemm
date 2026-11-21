@@ -7,6 +7,8 @@
 // divisible by it, and bench_cpu exits with an error for any other N.
 constexpr int COL_BLOCK = 64;
 constexpr int PAIR = 2;  // channels consumed together by _mm256_madd_epi16
+// mixed_sep_avx2_opt1 computes ROW_BLOCK rows at once; bench_cpu exits with an error when M is not a multiple.
+constexpr int ROW_BLOCK = 4;
 
 struct Problem {
     int M, K, N;
@@ -34,6 +36,7 @@ struct Quant {
     int8_t* wp;  // kp x N x PAIR: the two channels of a pair side by side for each column
     float* xh;   // M x k: FP16-rounded outlier channels of X, stored as float (SPEC 17.2)
     float* wh;   // k x N: FP16-rounded outlier rows of W, stored as float
+    int32_t* xpk;  // M x kp: each channel pair of xq as one 32-bit word; only mixed_sep_avx2_opt1 fills it
 };
 
 struct PerTensor {
@@ -65,6 +68,10 @@ void outlier_tile_avx2(const Quant& q, int k, int i, int N, int j0, float* out);
 void int8_gemm_avx2(const Problem& p, const Quant& q, float* ci8);
 void outlier_gemm_avx2(const Problem& p, const Select& sel, const Quant& q, float* co);
 void merge_plain(const Problem& p, const float* ci8, const float* co, float* C);
+
+// int8_avx2_opt1.cpp
+void pack_x_pairs(const Problem& p, Quant* q);
+void int8_gemm_avx2_opt1(const Problem& p, const Quant& q, float* ci8);
 
 // fused_avx2.cpp
 void fused_gemm_avx2(const Problem& p, const Select& sel, const Quant& q, float* C);

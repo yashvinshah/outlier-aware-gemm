@@ -2,7 +2,7 @@
 CXX         = g++
 CXXFLAGS    = -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off -I../common
 SCALARFLAGS = -std=c++17 -O2 -fno-tree-vectorize -fno-tree-slp-vectorize -fopenmp -ffp-contract=off -I../common
-OBJS        = bench_cpu.o util.o select.o quant.o pertensor.o int8_scalar.o int8_avx2.o fused_avx2.o fp32_gemm.o
+OBJS        = bench_cpu.o util.o select.o quant.o pertensor.o int8_scalar.o int8_avx2.o int8_avx2_opt1.o fused_avx2.o fp32_gemm.o
 
 bench_cpu: $(OBJS)
 	$(CXX) -fopenmp -o $@ $(OBJS)

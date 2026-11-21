@@ -18,3 +18,21 @@ COVERAGE S5 flags (stddev / median above 0.10), accepted as reported by the huma
   - t = 5: `mixed_sep_avx2` at p = 0, 5, 10, 20 and `mixed_fused_avx2` at p = 0, 1, 5, 10, 20 (9 rows).
 - `B_sweep.csv`: `mixed_fused_avx2`, skinny16, t = 5, p = 1, 16 threads, ratio 0.491 (median 6.536 ms, max 17.291 ms); it was also flagged before the re-run (ratio 0.123). 1 row.
 - Groups C and D: no flagged rows.
+
+## Round 5 profile (`run_profile.sh` on c5, sq4096, t = 2, 16 threads; user-space `perf`, paranoid level 2)
+
+Facts from the pasted `perf stat` and `perf report` output (files `results/cpu/profile/stat_*.txt`, `report_*.txt`):
+
+| Configuration | cycles:u | instructions:u | IPC | cache-misses (share of refs) | `int8_tile_avx2` | `outlier_tile_avx2` |
+|---|---|---|---|---|---|---|
+| `mixed_sep_avx2` p = 5 | 99.290e9 | 327.178e9 | 3.30 | 2.381e9 (6.598%) | 78.99% | 11.99% |
+| `mixed_fused_avx2` p = 5 | 106.984e9 | 327.176e9 | 3.06 | 2.121e9 (5.901%) | 79.36% | 12.51% |
+| `mixed_sep_avx2` p = 0 | 99.251e9 | 327.154e9 | 3.30 | 0.445e9 (1.429%) | 88.25% | not listed |
+| `mixed_sep_avx2` p = 0.5 | 99.195e9 | 327.747e9 | 3.30 | 0.562e9 (1.749%) | 85.62% | 0.81% |
+
+- Fused and sep execute the same number of instructions (327.176e9 vs 327.178e9); the fused run took more cycles (IPC 3.06 vs 3.30). The merge pass is 0.90% of samples in sep (`merge_plain`) and 0.13% in fused (`fused_gemm_avx2`), so fusing can remove at most about 1% of the work. Both variants call `int8_tile_avx2` and `outlier_tile_avx2` as separate symbols.
+- Process-to-process spread (same configuration, separate processes, `data/perf/repeat_runs.csv`, not committed): `mixed_sep_avx2` p = 0 total medians 153.712 to 165.398 ms over 7 processes (int8 stage 139.292 to 150.971 ms); p = 5 totals 163.808 to 169.963 ms over 5 processes (int8 stage 131.443 to 138.098 ms). The `B_sweep.csv` row at p = 0, t = 2 (total 175.515 ms, int8 161.859 ms) is above all 7 of the p = 0 repeats. No systematic p = 0 penalty was found; the cause of that single high row is unexplained (hypotheses only: process-level variation, drift over the job).
+- Decision (optimization), approved by the human: `mixed_sep_avx2_opt1`, a 4-row x 16-column register-blocked INT8 micro-kernel with the X channel pairs pre-packed as 32-bit words (`cpu/int8_avx2_opt1.cpp`). The dominant cost it targets is `int8_tile_avx2` (79 to 88% of samples). `mixed_sep_avx2` and the other variants are unchanged. The `pack_x_pairs` time is counted in the quantize stage. The gain is reported only as measured (group E against group B), not as an estimate. Status: code written, not yet built or run.
+- Group E job design (human ruling): each opt1 run is followed in the same job by the base `mixed_sep_avx2` run of the same configuration (`results/cpu/E_base.csv`); the before/after comparison uses these same-job base rows, and `B_sweep.csv` rows are context only. `E_opt.csv` keeps the six opt1 rows.
+- p = 0 reference rows: kept as they are (human ruling: option a). The human may later propose replicate jobs of groups A and B with the median per configuration; no code for that exists.
+- `data/perf/perf_runs.csv` and `repeat_runs.csv` are to be copied into `results/cpu/profile/` on ARC by the human, so that they are in git.
