@@ -10,6 +10,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BENCH="$REPO_DIR/cpu/bench_cpu"
 DATA_DIR="$REPO_DIR/data"
+
+# Optional replicate number as the first argument of a group script. The rows then go to
+# results/cpu/rep/<group>_rep<N>.csv (see csv_name) and the env file gets the suffix _rep<N> (see env_tag).
+# This file is sourced without arguments, so the shift removes the number from the calling script's
+# own arguments and leaves only the shape names.
+REP=""
+case "${1:-}" in
+    ''|*[!0-9]*) ;;
+    *) REP="$1"; shift ;;
+esac
+if [ -n "$REP" ]; then
+    CSV_DIR="$REPO_DIR/results/cpu/rep"
+fi
 : "${CSV_DIR:=$REPO_DIR/results/cpu}"
 
 export OMP_PROC_BIND=close
@@ -55,7 +68,19 @@ env_tag() {
     if [ "$#" -gt 0 ]; then
         tag="${tag}_$(echo "$*" | tr ' ' '_')"
     fi
+    if [ -n "$REP" ]; then
+        tag="${tag}_rep${REP}"
+    fi
     echo "$tag"
+}
+
+# csv_name <group file name without .csv>: the CSV file name, with _rep<N> added for a replicate job.
+csv_name() {
+    if [ -n "$REP" ]; then
+        echo "${1}_rep${REP}.csv"
+    else
+        echo "${1}.csv"
+    fi
 }
 
 # require_fresh <csv name> <shapes...>: exits if the CSV already has rows for one of the shapes,

@@ -22,7 +22,7 @@ case "$MINUTES" in
     ''|*[!0-9]*) echo "submit.sh: walltime must be a whole number of minutes" >&2; exit 1 ;;
 esac
 
-LOG="$HOME/${NAME%.sh}_$(date +%Y%m%d_%H%M%S).out"
+LOG="$HOME/${NAME%.sh}_$(date +%Y%m%d_%H%M%S)_$$.out"
 sbatch --partition="$PARTITION" --nodelist="$NODE" --exclusive --nodes=1 --time="$MINUTES" \
     --output="$LOG" --wrap="bash $SCRIPT_DIR/$NAME $*"
 echo "log: $LOG"

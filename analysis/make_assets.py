@@ -15,6 +15,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.ticker import NullFormatter
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUT = os.path.join(ROOT, "analysis", "out")
@@ -129,9 +130,9 @@ def fig_f1(df, noise):
         ax.set_ylabel("GFLOP/s")
         ax.set_yscale("log" if lane == "gpu" else "linear")
         set_p_axis(ax)
-        ax.legend(loc="center right" if lane == "cpu" else "lower left")
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)  # below the axes: no data hidden
     fig.tight_layout()
-    fig.text(0.01, -0.02, "Grey bars (CPU): range over 5 separate processes at p = 0 and p = 5 only (sq4096). "
+    fig.text(0.01, -0.2,"Grey bars (CPU): range over 5 separate processes at p = 0 and p = 5 only (sq4096). "
              "The GPU has no replicate processes.", fontsize=11, color=INK2)
     save(fig, "F1_gflops_vs_p_sq4096")
 
@@ -146,13 +147,16 @@ def fig_f3(df):
                 d = sweep(df, lane, fam, shape)
                 ax.plot(d["rel_err"], d["gflops"], marker="o", color=COLOR[fam], label=LABEL[fam])
                 if fam == "mixed_sep":
-                    for _, row in d.iterrows():
+                    # Alternate the offset so the labels of neighbouring points (p = 0, 0.5, 1) do not collide.
+                    for n, (_, row) in enumerate(d.iterrows()):
                         ax.annotate(f"{row['iso_out_pct']:g}", (row["rel_err"], row["gflops"]),
-                                    textcoords="offset points", xytext=(6, 6), fontsize=12, color=INK2)
+                                    textcoords="offset points", xytext=(8, 8) if n % 2 == 0 else (8, -18),
+                                    fontsize=12, color=INK2)
             pt = single(df, lane, "int8_pertensor", shape)
             ax.plot(pt["rel_err"], pt["gflops"], marker="*", markersize=16, linestyle="none",
                     color=COLOR["int8_pertensor"], label="int8_pertensor")
             ax.set_xscale("log")
+            ax.xaxis.set_minor_formatter(NullFormatter())  # the default minor labels overlap
             ax.set_title(f"{lane.upper()}, {shape}, t = 2 (labels: p in %)")
             ax.set_xlabel("relative error vs FP32 (log)")
             ax.set_ylabel("GFLOP/s")
@@ -176,7 +180,7 @@ def fig_f4(df):
         ax.set_title(f"{lane.upper()}, mixed_sep, sq4096, t = 2")
         ax.set_ylabel("time per repetition (ms)")
         set_p_axis(ax)
-        ax.legend(loc="upper left")
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
     fig.tight_layout()
     save(fig, "F4_stage_times")
 
@@ -199,20 +203,23 @@ def ladder_bars(df):
 
 
 def fig_f6(df):
-    """F6: the ladder at sq2048, t = 2, p = 5, log y because CPU and GPU differ by orders of magnitude."""
+    """F6: the ladder at sq2048, t = 2, p = 5. Both panels start at zero. CPU: speedup over the scalar
+    kernel; GPU: GFLOP/s."""
     rows = ladder_bars(df)
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.2))
     for ax, lane in zip(axes, LANES):
         sel = [r for r in rows if r[0] == lane]
-        ax.bar(range(len(sel)), [r[2] for r in sel], color=[COLOR[r[3]] for r in sel], width=0.6)
-        for i, r in enumerate(sel):
-            ax.text(i, r[2] * 1.08, f"{r[2]:,.0f}", ha="center", fontsize=13, color=INK)
+        scale = 1.0 / sel[0][2] if lane == "cpu" else 1.0  # sel[0] is the scalar bar on the CPU
+        values = [r[2] * scale for r in sel]
+        ax.bar(range(len(sel)), values, color=[COLOR[r[3]] for r in sel], width=0.6)
+        for i, v in enumerate(values):
+            ax.text(i, v + max(values) * 0.02, f"{v:,.1f}x" if lane == "cpu" else f"{v:,.0f}",
+                    ha="center", fontsize=13, color=INK)
         ax.set_xticks(range(len(sel)))
         ax.set_xticklabels([r[1] for r in sel])
-        ax.set_yscale("log")
-        ax.set_ylim(top=max(r[2] for r in sel) * 2.2)
-        ax.set_ylabel("GFLOP/s (log)")
-        ax.set_title(f"{lane.upper()}, sq2048, t = 2" + (", p = 5" if lane == "cpu" else ", p = 5 (mixed)"))
+        ax.set_ylim(0, max(values) * 1.12)
+        ax.set_ylabel("speedup over scalar, 1 thread (x)" if lane == "cpu" else "GFLOP/s")
+        ax.set_title(f"{lane.upper()}, sq2048, t = 2, p = 5" + ("" if lane == "cpu" else " (mixed)"))
     fig.tight_layout()
     save(fig, "F6_ladder")
 

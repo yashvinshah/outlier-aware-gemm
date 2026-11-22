@@ -1,12 +1,13 @@
 #!/bin/bash
-# scripts/cpu/run_C_ladder.sh [shape ...]: COVERAGE group C, CPU lane.
+# scripts/cpu/run_C_ladder.sh [replicate number] [shape ...]: COVERAGE group C, CPU lane.
+# With a replicate number N the rows go to results/cpu/rep/C_ladder_rep<N>.csv (see lib.sh).
 # mixed_sep_scalar (1 thread), mixed_sep_avx2 (1 thread) and mixed_sep_avx2 (T threads) on sq1024 and
 # sq2048, t = 2, p in {0, 5}. Appends to results/cpu/C_ladder.csv. With shape arguments only those run.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 SHAPES=$(pick_shapes "sq1024 sq2048" "$@")
-CSV=C_ladder.csv
+CSV=$(csv_name C_ladder)
 require_fresh "$CSV" $SHAPES
 start_job "$(env_tag C_ladder "$@")"
 
