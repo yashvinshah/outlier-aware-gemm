@@ -31,9 +31,9 @@ No fast-math flag is used. `--fmad=false`, `--prec-div=true` and `-ffp-contract=
 
 ## 3. Round 5: profile, decision and result
 
-**Profile target.** `mixed_sep`, sq4096, t = 2, p = 5, tile 16, profiled with `nsys` and `ncu` [`profile/nsys_mixed_sep_sq4096_p5.txt`, `profile/ncu_int8_gemm_sq4096_p5.txt`]. The profile run used 1 warmup and 3 repetitions (profile only; `profile/profile_runs.csv`).
+**Profile target.** `mixed_sep`, sq4096, t = 2, p = 5, tile 16, profiled with `nsys` and `ncu` [`profile/nsys_mixed_sep_sq4096_p5.txt`, `profile/ncu_int8_gemm_sq4096_p5.txt`]. The `nsys` run used 1 warmup and 3 repetitions and the `ncu` run 1 warmup and 1 repetition (profile only; `profile/profile_runs.csv`). Both ran on node `c0` [`env_profile.txt`].
 
-**Where the time goes** [`profile/nsys_mixed_sep_sq4096_p5.txt` | section `cuda_gpu_kern_sum`, 4 instances per kernel]: `int8_gemm_kernel<16>` 80.7% of kernel time (30.41 ms per launch on average), `outlier_kernel<16>` 12.3% (4.64 ms), `merge_kernel<16>` 2.1% (0.80 ms); the select, quantize, pack and gather kernels are each 0.8% or less.
+**Where the time goes** [`profile/nsys_mixed_sep_sq4096_p5.txt` | section `cuda_gpu_kern_sum`, 4 instances per kernel]: `int8_gemm_kernel<16>` 80.7% of kernel time (30.41 ms per launch on average), `outlier_kernel<16>` 12.3% (4.64 ms), `merge_kernel<16>` 2.1% (0.80 ms); the other seven kernels are 1.3% or less each (`row_scale_kernel` 1.3%, `col_scale_kernel`, `pack_w_kernel`, `pack_x_kernel` 0.8% each, `colmax_kernel` 0.7%, `gather_xh_kernel` 0.3%, `gather_wh_kernel` 0.0%).
 
 **Why the INT8 kernel is slow** [`profile/ncu_int8_gemm_sq4096_p5.txt`]:
 - L1/TEX throughput 97.13% and memory throughput 97.10%, compute (SM) throughput 29.50%, DRAM throughput 1.03%.
@@ -67,10 +67,10 @@ No fast-math flag is used. `--fmad=false`, `--prec-div=true` and `-ffp-contract=
 
 Each one is reported as found; none is explained unless stated.
 
-1. **Three nodes for three groups.** Group A ran on `c41`, B on `c44`, C on `c23` and the golden run on `c37`; E ran on `c1` [`env_A_baselines.txt`, `env_B_sweep.txt`, `env_C_tiles.txt`, `env_golden.txt`, `env_E_opt.txt` | `SLURMD_NODENAME`]. The jobs were not pinned. All env files show an RTX 4060 Ti.
+1. **Three nodes for three groups.** Group A ran on `c41`, B on `c44`, C on `c23` and the golden run on `c37`; E ran on `c1`, the paired control on `c23`, and the `mixed_sep_opt1` golden run and the profile on `c0` [`env_A_baselines.txt`, `env_B_sweep.txt`, `env_C_tiles.txt`, `env_golden.txt`, `env_E_opt.txt`, `env_E_base.txt`, `env_golden_opt1.txt`, `env_profile.txt` | `SLURMD_NODENAME`]. The jobs were not pinned. All env files show an RTX 4060 Ti.
 2. **Driver versions differ.** 615.71.09 on `c3` during Round 0 (`docs/env_gpu.md` fact 12) against 580.82.07 in all later env files (`docs/env_gpu.md` fact 21). Cause unknown.
 3. **16 CPUs per job** (`SLURM_CPUS_ON_NODE=16`, `nproc` 16 [`env_golden.txt`]) although `-c 4` was requested for the interactive allocation.
-4. **Timing at `p = 0` varies across t on sq2048, and on one skinny16 row** [`B_sweep.csv` | `total_ms_median`, p=0]: `mixed_sep` sq2048 4.462 / 4.179 / 4.461 ms for t = 0.5 / 2 / 5; `mixed_fused` sq2048 4.432 / 4.358 / 4.047 ms; `mixed_sep` skinny16 0.912 / 0.952 / 0.952 ms. The same work with different input values. At sq4096, sq1024 and skinny128 the three values agree within about 1%. The CPU lane reports a similar pattern at sq4096. Cause unknown. It makes "cost relative to p = 0" less reliable at small p on sq2048.
+4. **Timing at `p = 0` varies across t on sq2048, and on one skinny16 row** [`B_sweep.csv` | `total_ms_median`, p=0]: `mixed_sep` sq2048 4.462 / 4.179 / 4.461 ms for t = 0.5 / 2 / 5; `mixed_fused` sq2048 4.432 / 4.358 / 4.047 ms; `mixed_sep` skinny16 0.912 / 0.952 / 0.952 ms. The same work with different input values. At sq4096, sq1024 and skinny128 the three values agree within about 1%. The CPU lane reported a similar pattern for `mixed_sep_avx2` at sq4096 (message from Lane A, 2026-11-20; not checked against the CPU CSV here). Cause unknown. It makes "cost relative to p = 0" less reliable at small p on sq2048.
 5. **sq2048 p = 1 base `t_int8_ms` differs by node:** 3.749 ms on `c44` [`B_sweep.csv`] against 4.014 ms on `c23` [`E_base.csv`] (about 7%). The other five group E configurations agree within 0.1% between the two nodes. Cause unknown.
 6. **sq4096 p = 1 group E row is slower than its paired control:** 19.351 ms [`E_opt.csv`, node `c1`] against 17.446 ms [`E_pair_opt.csv`, node `c23`]. The `E_opt.csv` row has the largest relative stddev in the file (0.762 on a median total of 23.18 ms, about 3.3%). Hypothesis (not tested): run-to-run noise on that job.
 7. **INT8 path slower than cuBLAS FP32.** At sq4096, t = 2: `fp32_cublas` 12,473.528 GFLOP/s, `int8_pertensor` 4,466.539 GFLOP/s [`A_baselines.csv`]. Observation, not a defect: the INT8 kernel is the simple Round 1 version. Not investigated beyond the profile in section 3.
@@ -80,7 +80,7 @@ Each one is reported as found; none is explained unless stated.
 
 ## 5. Validation summary (GPU lane)
 
-Checks run on the three group CSVs and `E_opt.csv`, all on 2026-11-20 and 2026-11-21 [`A_baselines.csv`, `B_sweep.csv`, `C_tiles.csv`, `E_opt.csv`]:
+Checks run on the three group CSVs and `E_opt.csv` [`A_baselines.csv`, `B_sweep.csv`, `C_tiles.csv`, `E_opt.csv`]:
 
 - Headers equal SPEC 10; rows 20 (A), 210 (B), 12 (C), 6 (E); no duplicate configurations.
 - S2: `fp32_cublas` largest `rel_err` 1.150e-06 (limit 1e-5) [`A_baselines.csv`].
@@ -95,6 +95,6 @@ Checks run on the three group CSVs and `E_opt.csv`, all on 2026-11-20 and 2026-1
 - **One seed, one outlier magnitude (x50), synthetic data.** Results say nothing about real data.
 - **`mixed_fused` has the same shared-memory read pattern as the original INT8 kernel** (`gpu/fused.cu`, `wq_s[tx][w]`) and was not profiled or optimized. Reading the code suggests the same bank conflict; this is not verified.
 - **The optimization covers `mixed_sep` only**, at tile 16 in group E. The tile sweep (group C) uses the original kernels.
-- **Node variation.** Groups ran on different nodes (anomaly 1). Exclusive nodes were requested in every job script (`#SBATCH --exclusive`); the env files do not show whether another job shared the GPU.
+- **Node variation.** Groups ran on different nodes (anomaly 1). Exclusive nodes were requested in the batch scripts for groups A, B, C, E and the control (`#SBATCH --exclusive`). The golden runs and the profile ran in interactive allocations without that option. The env files do not show whether another job shared the GPU.
 - **`fp32_cublas` uses the default math mode.** The golden check excludes it (SPEC 13); its `rel_err` (S2) is the only correctness evidence.
 - **Throughput cost relative to p = 0 at small p is affected by anomaly 4.**
