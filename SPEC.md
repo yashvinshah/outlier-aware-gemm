@@ -298,6 +298,8 @@ The numbers follow the order of Lane A's review list.
 12. **Which variant gets `_opt1`.** Decided in Round 5 from the profile data and approved by the humans before any code is written.
 13. **Git in the env script.** The job scripts may call `git rev-parse HEAD`. The humans run the scripts on ARC. The ban in CLAUDE.md rule 1 applies to Claude Code itself, which never runs git.
 14. **Aligned allocation.** `posix_memalign` with 64-byte alignment (CPU lane). Confirm on the first ARC build.
+15. **`rel_err` arithmetic (applies to 17.3).** Per element: `d = (double)C[i] - (double)R[i]`; `num += d * d`; `den += (double)R[i] * (double)R[i]`. Both operands are widened to double before the subtraction. Then `rel_err = sqrt(num) / sqrt(den)`. Host code only, compiled with `-ffp-contract=off` and no fast-math, in both lanes.
+16. **Median of an even count.** SPEC 8 does not define the median when the number of values is even. The median is the mean of the two middle values of the sorted list. This applies wherever repetitions are aggregated, in both lanes.
 
 ## 18. Rulings (Nov 17, second batch)
 
@@ -329,4 +331,6 @@ Agreed by both humans. Section 17 is unchanged. Where a ruling is applied in ano
 - 2026-11-17 (final rulings), SPEC section 13 step 4: `_opt1` bullet replaced by equality with the base variant's checksum.
 - 2026-11-17 (final rulings), SPEC section 8 and section 18 item 4: once-only zero-fills are untimed; per-repetition packing, gathering and transposing is timed in `t_quant_ms`.
 - 2026-11-17 (final rulings), CLAUDE.md Round 5, COVERAGE section 5, LANE_CPU.md and LANE_GPU.md (Round 0c, Round 5, timing notes): aligned to the four rulings above.
+- 2026-11-18, SPEC section 17: item 15 added (`rel_err` arithmetic, double subtraction), agreed by both lanes.
+- 2026-11-19, SPEC section 17: item 16 added (median of an even count), a ruling of 2026-11-19 that was only in a code comment until now; added to the spec on 2026-11-22.
 - 2026-11-17, LANE_CPU.md and LANE_GPU.md: ownership of `results/`; Round 0c walltime question; `checksum.h`; Round 1 and Round 2 helper-script wording; untimed-setup notes; Round 5 golden re-run and group E script; GPU `--prec-div` and `common/` not merged (rulings A, D, E, G, I, J).
