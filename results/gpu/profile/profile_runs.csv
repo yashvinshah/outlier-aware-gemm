@@ -1,0 +1,3 @@
+lane,variant,shape,M,K,N,true_out_pct,iso_out_pct,k_isolated,threads,tile,warmups,reps,t_select_ms,t_quant_ms,t_int8_ms,t_outlier_ms,t_merge_ms,total_ms_median,total_ms_min,total_ms_max,total_ms_stddev,gflops,rel_err,outlier_recall
+gpu,mixed_sep,sq4096,4096,4096,4096,2,5,205,,16,1,3,0.541513,1.547920,30.410275,4.646640,0.803535,37.949883,37.929134,37.967604,0.015722,3621.591,1.691093012e-03,1.000000
+gpu,mixed_sep,sq4096,4096,4096,4096,2,5,205,,16,1,1,0.585223,1.599610,27.698917,4.244966,0.828875,34.957591,34.957591,34.957591,0.000000,3931.591,1.691093012e-03,1.000000
