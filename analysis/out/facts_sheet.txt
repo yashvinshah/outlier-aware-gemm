@@ -1,0 +1,98 @@
+FACTS SHEET: format is value [min-max] n=processes [file | filter]; machines are in section (7)
+(1) CPU, sq4096, t = 2, 16 threads: GFLOP/s, median [min-max] n; cost vs p = 0 (median of p vs median of p = 0)
+  mixed_sep_avx2  p=0: 805.2 [783.1-853.1] n=3  [cpu/B_sweep.csv+rep1,2 | mixed_sep_avx2, sq4096, t=2, p=0]
+    p=1: 849.6 [837.7-864.1] n=3; cost -5.5% (allowed -10.3 to 1.8%): within noise: not a finding
+    p=5: 805.9 [805.2-818.5] n=3; cost -0.1% (allowed -4.5 to 5.6%): within noise: not a finding
+    p=10: 756.7 [709.8-766.9] n=3; cost 6.0% (allowed 2.1 to 16.8%): above noise (cost)
+  mixed_fused_avx2  p=0: 849.2 [848.7-855.5] n=3  [cpu/B_sweep.csv+rep1,2 | mixed_fused_avx2, sq4096, t=2, p=0]
+    p=1: 841.5 [839.5-849.9] n=3; cost 0.9% (allowed -0.1 to 1.9%): within noise: not a finding
+    p=5: 756.4 [739.0-777.5] n=3; cost 10.9% (allowed 8.4 to 13.6%): above noise (cost)
+    p=10: 592.9 [577.6-670.0] n=3; cost 30.2% (allowed 21.1 to 32.5%): above noise (cost)
+
+(2) rel_err, sq4096, t = 2 (identical in all processes), factor = int8_pertensor / mixed_sep
+  CPU int8_pertensor: 6.998e-02  [cpu/A_baselines.csv+rep1,2 | int8_pertensor, sq4096, t=2]
+  GPU int8_pertensor: 6.998e-02  [gpu/A_baselines.csv | int8_pertensor, sq4096, t=2]
+  CPU mixed_sep  p=0: 4.422e-02 (x1.6); p=1: 3.980e-02 (x1.8); p=5: 1.691e-03 (x41.4); p=10: 1.635e-03 (x42.8)  [cpu/B_sweep.csv+rep1,2 | sq4096 t=2]
+  GPU mixed_sep  p=0: 4.422e-02 (x1.6); p=1: 3.980e-02 (x1.8); p=5: 1.691e-03 (x41.4); p=10: 1.635e-03 (x42.8)  [gpu/B_sweep.csv | sq4096 t=2]
+
+(3) stage breakdown, mixed_sep, sq4096, t = 2, p = 5: ms, median [min-max]; share of the stage sum
+  CPU: select 1.06 [1.05-1.07] n=3 (0.6%); quant 9.41 [9.30-9.66] n=3 (5.5%); INT8 137.85 [136.08-139.59] n=3 (81.3%); outlier 19.64 [19.08-20.35] n=3 (11.6%); merge 1.59 [1.59-1.61] n=3 (0.9%)
+      stage sum 169.54 ms; total_ms_median 170.54 [167.91-170.69] n=3  [cpu/B_sweep.csv+rep1,2 | mixed_sep_avx2, sq4096, t=2, p=5]
+  GPU: select 0.96 n=1 (2.7%); quant 1.54 n=1 (4.4%); INT8 27.39 n=1 (78.5%); outlier 4.18 n=1 (12.0%); merge 0.81 n=1 (2.3%)
+      stage sum 34.88 ms; total_ms_median 34.88 n=1  [gpu/B_sweep.csv | mixed_sep, sq4096, t=2, p=5]
+
+(4) ladder, sq2048, t = 2, p = 5: GFLOP/s median [min-max] n
+  CPU scalar 1 thread: 5.5 [5.5-5.6] n=3, x1.0 over scalar  [cpu/C_ladder.csv+rep1,2 | mixed_sep_scalar, sq2048, t=2, p=5, threads=1]
+  CPU AVX2 1 thread: 84.4 [83.4-85.8] n=3, x15.3 over scalar  [cpu/C_ladder.csv+rep1,2 | mixed_sep_avx2, sq2048, t=2, p=5, threads=1]
+  CPU AVX2 + OpenMP 16 threads: 908.5 [899.6-916.3] n=3, x165.0 over scalar  [cpu/C_ladder.csv+rep1,2 | mixed_sep_avx2, sq2048, t=2, p=5, threads=16]
+  GPU int8_pertensor: 3979.3 n=1  [gpu/A_baselines.csv | int8_pertensor, sq2048, t=2, p=5]
+  GPU mixed_sep: 3122.9 n=1  [gpu/B_sweep.csv | mixed_sep, sq2048, t=2, p=5]
+  GPU mixed_fused: 3278.0 n=1  [gpu/B_sweep.csv | mixed_fused, sq2048, t=2, p=5]
+
+(5) opt1 (mixed_sep_avx2_opt1) vs mixed_sep_avx2, same job, t = 2, 16 threads, n = 4 each: total_ms and INT8 stage, median [min-max]
+  sq2048 p=1 total: base 19.70 [19.56-19.83] n=4 -> opt1 18.55 [18.36-18.66] n=4: -5.9%, opt1 range entirely below base range
+  sq2048 p=1 INT8 stage: base 14.66 [14.51-14.82] n=4 -> opt1 13.85 [13.73-13.97] n=4: -5.5%, opt1 range entirely below base range
+  sq2048 p=5 total: base 19.05 [18.96-19.07] n=4 -> opt1 19.55 [19.45-21.32] n=4: +2.6%, opt1 range entirely above base range
+  sq2048 p=5 INT8 stage: base 14.52 [14.46-14.56] n=4 -> opt1 14.99 [14.95-17.48] n=4: +3.2%, opt1 range entirely above base range
+  sq2048 p=10 total: base 22.63 [21.06-27.28] n=4 -> opt1 23.18 [19.67-23.42] n=4: +2.4%, ranges overlap
+  sq2048 p=10 INT8 stage: base 15.63 [13.84-20.80] n=4 -> opt1 16.81 [12.88-17.14] n=4: +7.6%, ranges overlap
+  sq4096 p=1 total: base 163.73 [162.33-165.27] n=4 -> opt1 152.55 [151.50-152.84] n=4: -6.8%, opt1 range entirely below base range
+  sq4096 p=1 INT8 stage: base 143.06 [141.13-144.69] n=4 -> opt1 132.91 [131.98-133.42] n=4: -7.1%, opt1 range entirely below base range
+  sq4096 p=5 total: base 168.76 [167.69-188.68] n=4 -> opt1 158.58 [157.87-159.15] n=4: -6.0%, opt1 range entirely below base range
+  sq4096 p=5 INT8 stage: base 137.27 [136.12-158.65] n=4 -> opt1 129.03 [127.86-129.18] n=4: -6.0%, opt1 range entirely below base range
+  sq4096 p=10 total: base 180.70 [175.56-185.25] n=4 -> opt1 168.06 [167.82-169.33] n=4: -7.0%, opt1 range entirely below base range
+  sq4096 p=10 INT8 stage: base 130.26 [124.46-135.36] n=4 -> opt1 119.84 [119.57-120.58] n=4: -8.0%, opt1 range entirely below base range
+  sources: cpu/E_opt.csv+rep1,2,3 (opt1) and cpu/E_base.csv+rep1,2,3 (base)
+  GPU paired control, same job: mixed_sep (E_base.csv) vs mixed_sep_opt1 (E_pair_opt.csv), t = 2, tile 16; n = 1, no noise range: indicative, not a finding
+    sq2048 p=1 total: base 5.02 n=1 -> opt1 3.43 n=1: -31.7%
+    sq2048 p=1 INT8 stage: base 4.01 n=1 -> opt1 2.43 n=1: -39.5%
+    sq2048 p=5 total: base 5.35 n=1 -> opt1 3.81 n=1: -28.7%
+    sq2048 p=5 INT8 stage: base 3.88 n=1 -> opt1 2.35 n=1: -39.5%
+    sq2048 p=10 total: base 5.66 n=1 -> opt1 4.12 n=1: -27.2%
+    sq2048 p=10 INT8 stage: base 3.63 n=1 -> opt1 2.13 n=1: -41.3%
+    sq4096 p=1 total: base 32.63 n=1 -> opt1 21.26 n=1: -34.8%
+    sq4096 p=1 INT8 stage: base 28.81 n=1 -> opt1 17.45 n=1: -39.4%
+    sq4096 p=5 total: base 34.52 n=1 -> opt1 23.70 n=1: -31.3%
+    sq4096 p=5 INT8 stage: base 27.38 n=1 -> opt1 16.56 n=1: -39.5%
+    sq4096 p=10 total: base 37.40 n=1 -> opt1 27.12 n=1: -27.5%
+    sq4096 p=10 INT8 stage: base 26.16 n=1 -> opt1 15.89 n=1: -39.3%
+    sources: gpu/E_base.csv and gpu/E_pair_opt.csv
+  GPU job-to-job difference, same variant mixed_sep_opt1: E_opt.csv relative to E_pair_opt.csv; n = 1, no noise range: indicative, not a finding
+    sq2048 p=1: total 3.34 vs 3.43 (-2.7%); INT8 stage 2.43 vs 2.43 (+0.0%)
+    sq2048 p=5: total 3.72 vs 3.81 (-2.5%); INT8 stage 2.35 vs 2.35 (+0.0%)
+    sq2048 p=10: total 4.13 vs 4.12 (+0.2%); INT8 stage 2.20 vs 2.13 (+2.9%)
+    sq4096 p=1: total 23.18 vs 21.26 (+9.1%); INT8 stage 19.35 vs 17.45 (+10.9%)
+    sq4096 p=5: total 23.95 vs 23.70 (+1.1%); INT8 stage 16.83 vs 16.56 (+1.7%)
+    sq4096 p=10: total 27.47 vs 27.12 (+1.3%); INT8 stage 16.16 vs 15.89 (+1.7%)
+    sources: gpu/E_opt.csv and gpu/E_pair_opt.csv
+
+(6) correctness
+  golden p=0: CPU 6 runs, 1 distinct; opt1 1 distinct; GPU 6 runs, 1 distinct; CPU vs GPU vs opt1: equal; GPU opt1 3 runs, 1 distinct, equal to CPU opt1: equal
+  golden p=2: CPU 6 runs, 1 distinct; opt1 1 distinct; GPU 6 runs, 1 distinct; CPU vs GPU vs opt1: equal; GPU opt1 3 runs, 1 distinct, equal to CPU opt1: equal
+  golden p=10: CPU 6 runs, 1 distinct; opt1 1 distinct; GPU 6 runs, 1 distinct; CPU vs GPU vs opt1: equal; GPU opt1 3 runs, 1 distinct, equal to CPU opt1: equal
+  golden int8_pertensor: CPU 1 distinct, GPU 1 distinct, equal; fp32_omp vs fp32_serial: equal
+  rel_err CPU = GPU (exact text) on 225 of 225 keys (mixed_sep, mixed_fused, int8_pertensor); keys with differing rel_err between processes: 0  [cpu/{A,B}_*.csv+rep1,2 | gpu/{A,B}_*.csv]
+
+(7) machine
+  CPU [cpu/env_B_sweep.txt]: AMD EPYC 9115 16-Core Processor, node c5, nproc 16, 16 cores x 1 thread per core, g++ 12.4.0
+      flags: g++ -std=c++17 -O3 -mavx2 -mf16c -fopenmp -ffp-contract=off; threads in group B: 16
+  GPU [gpu/env_B_sweep.txt]: NVIDIA GeForce RTX 4060 Ti, 16380MiB, node c44, partition rtx4060ti16g, driver 580.82.07, nvcc release 13.4
+      NVCCFLAGS: -std=c++17 -O3 -arch=sm_89 --fmad=false --prec-div=true -Xcompiler "-O3 -ffp-contract=off"; tile in group B: 16; tiles in group C: 8, 16, 32
+  GPU env files [results/gpu/env_*.txt | hostname and nvidia-smi sections]:
+      env_A_baselines.txt: node c41, driver 580.82.07
+      env_B_sweep.txt: node c44, driver 580.82.07
+      env_C_tiles.txt: node c23, driver 580.82.07
+      env_E_base.txt: node c23, driver 580.82.07
+      env_E_opt.txt: node c1, driver 580.82.07
+      env_golden.txt: node c37, driver 580.82.07
+      env_golden_opt1.txt: node c0, driver 615.71.10
+      env_profile.txt: node c0, driver 615.71.10
+      distinct driver values: 2: 580.82.07 in env_A_baselines.txt, env_B_sweep.txt, env_C_tiles.txt, env_E_base.txt, env_E_opt.txt, env_golden.txt; 615.71.10 in env_golden_opt1.txt, env_profile.txt
+
+(8) caveats for the slides
+  - synthetic data, one outlier magnitude (x50), one seed (COVERAGE.md section 6, list of claims we must not make)
+  - GPU rows are single processes (n = 1): no noise range, so no GPU cost is a finding; CPU ranges are n = 3 (n = 4 for E), only a rough estimate
+  - int8_pertensor on the CPU is a plain-loop kernel, the mixed variants use AVX2: a CPU comparison against it compares kernel styles (docs/LANE_NOTES_cpu.md)
+  - sq1024 is noisy: 86 of 159 sq1024 CPU process rows (groups A, B, C, original + replicates) have stddev/median above 0.10; all other shapes together 3 of 630 rows (groups A, B, C, E)
+  - GPU: host-side top-k selection and stage-boundary sync in the GPU timings; GPU node sharing status (COVERAGE.md section 6; not checked in GPU code)
+  - Noise range = min to max over the processes of the same configuration: n = 3 (groups A, B, C) or n = 4 (group E) on the CPU, n = 1 on the GPU (no range). This is only a rough noise estimate.
